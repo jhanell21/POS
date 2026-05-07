@@ -1,680 +1,1328 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Offline POS System</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Dexie.js for local database -->
-    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
-    
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
-    <!-- Prevent UI flashing before Alpine loads -->
-    <style>
-        [x-cloak] { display: none !important; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline POS System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    * { box-sizing: border-box; }
+    :root {
+      --bg: #f6f1ea;
+      --surface: rgba(255, 255, 255, 0.86);
+      --surface-strong: #ffffff;
+      --ink: #231f20;
+      --muted: #756b60;
+      --line: rgba(72, 54, 39, 0.12);
+      --brand: #a45f2a;
+      --brand-strong: #7c3f18;
+      --accent: #155e63;
+      --success: #28715d;
+      --shadow: 0 22px 60px rgba(57, 39, 24, 0.13);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #171513;
+        --surface: rgba(38, 34, 29, 0.88);
+        --surface-strong: #26221d;
+        --ink: #f8efe4;
+        --muted: #c9b9a7;
+        --line: rgba(255, 239, 220, 0.12);
+        --brand: #d89152;
+        --brand-strong: #f0af70;
+        --accent: #7ed7d0;
+        --success: #75c7a5;
+        --shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+      }
+    }
+    html { scroll-behavior: smooth; }
+    html, body { overflow-x: hidden; }
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(218, 153, 88, 0.28), transparent 32rem),
+        linear-gradient(135deg, var(--bg), #efe4d6 48%, #eef3ef);
+      color: var(--ink);
+      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    h1, h2 { font-family: "Outfit", "Inter", sans-serif; letter-spacing: 0; }
+    table { border-collapse: separate; border-spacing: 0; }
+    button, input, select {
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+    }
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button:active:not(:disabled) { transform: translateY(0) scale(0.99); }
+    .no-hover-lift:hover,
+    .no-hover-lift:active {
+      transform: none !important;
+      box-shadow: none !important;
+    }
+    .password-toggle {
+      transform: translateY(-50%) !important;
+      transition: color 160ms ease;
+    }
+    .password-toggle:hover,
+    .password-toggle:active {
+      transform: translateY(-50%) !important;
+      box-shadow: none !important;
+      background: transparent !important;
+    }
+    input:focus, select:focus {
+      box-shadow: 0 0 0 4px rgba(164, 95, 42, 0.14);
+      border-color: var(--brand) !important;
+    }
+    .premium-bg {
+      background:
+        radial-gradient(circle at 12% 20%, rgba(164, 95, 42, 0.18), transparent 24rem),
+        radial-gradient(circle at 86% 12%, rgba(21, 94, 99, 0.16), transparent 22rem),
+        linear-gradient(135deg, #fbf7f1, #f2e8db 52%, #eef5f1);
+    }
+    .glass-card {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .soft-card {
+      border: 1px solid var(--line);
+      background: var(--surface-strong);
+      box-shadow: 0 12px 34px rgba(57, 39, 24, 0.08);
+    }
+    .primary-btn {
+      background: linear-gradient(135deg, var(--brand), var(--brand-strong));
+      color: white;
+      box-shadow: 0 12px 28px rgba(124, 63, 24, 0.24);
+    }
+    .secondary-btn {
+      background: #231f20;
+      color: white;
+      box-shadow: 0 12px 28px rgba(35, 31, 32, 0.18);
+    }
+    .ghost-btn { background: rgba(255, 255, 255, 0.7); border: 1px solid var(--line); color: var(--ink); }
+    .table-scroll {
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .table-scroll::-webkit-scrollbar { height: 8px; }
+    .table-scroll::-webkit-scrollbar-thumb { background: rgba(124, 63, 24, 0.24); border-radius: 999px; }
+    .mobile-safe-modal {
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .page-enter { animation: fadeSlide 360ms ease both; }
+    .toast-enter { animation: toastIn 420ms cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-14px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @media (prefers-color-scheme: dark) {
+      body, .premium-bg { background: linear-gradient(135deg, #171513, #211c17 52%, #122123); }
+      .bg-white, .bg-gray-50, .bg-gray-100 { background-color: var(--surface-strong) !important; }
+      .text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700 { color: var(--ink) !important; }
+      .text-gray-600, .text-gray-500, .text-gray-400 { color: var(--muted) !important; }
+      .border, .border-b, .border-t, .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: var(--line) !important; }
+      input, select { background-color: rgba(255, 255, 255, 0.06) !important; color: var(--ink); }
+    }
+    @media (max-width: 640px) {
+      body { background-attachment: fixed; }
+      h1 { font-size: 2rem !important; line-height: 1.05 !important; }
+      h2 { line-height: 1.15 !important; }
+      .glass-card, .soft-card { border-radius: 1.25rem !important; }
+      button, input, select { min-height: 44px; }
+      .mobile-full > * { width: 100%; justify-content: center; text-align: center; }
+      .mobile-tight { padding: 1rem !important; }
+      .table-scroll { margin-inline: -0.5rem; padding-inline: 0.5rem; }
+    }
+  </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800 h-screen overflow-auto" x-data="posApp()" x-init="initApp()">
+<body class="bg-gray-100 font-sans text-gray-800" x-data="posApp()" x-init="initApp()">
 
-    <!-- ==========================================
-         VIEW 1: POS REGISTER 
-         ========================================== -->
-    <div x-cloak x-show="currentView === 'pos'" class="flex flex-col md:flex-row h-full w-full">
-        
-        <!-- Left Side: Product Grid -->
-        <div class="flex-1 flex flex-col h-full bg-gray-50">
-            <!-- Top Bar -->
-            <div class="bg-white p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between border-b gap-4">
-                <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <h1 class="text-2xl font-bold text-gray-800">Register</h1>
-                    <button @click="switchView('admin')" class="px-4 py-2 bg-gray-800 text-white font-semibold rounded-lg hover:bg-gray-700 transition flex items-center shadow-sm">
-                        ⚙️ Admin Panel
-                    </button>
-                </div>
-                
-                <div class="flex space-x-2 overflow-x-auto pb-1">
-                    <button @click="activeCategory = 'All'" 
-                            :class="activeCategory === 'All' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
-                            class="px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition">
-                        All
-                    </button>
-                    <template x-for="cat in categories" :key="cat.name">
-                        <button @click="activeCategory = cat.name" 
-                                :class="activeCategory === cat.name ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
-                                class="px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition"
-                                x-text="cat.name">
-                        </button>
-                    </template>
-                </div>
-            </div>
+  <div x-cloak x-show="toast.show" class="fixed left-1/2 top-5 z-[60] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 toast-enter">
+    <div class="glass-card flex items-center gap-3 rounded-2xl px-4 py-3">
+      <div class="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-black text-green-700">OK</div>
+      <div>
+        <p class="font-bold text-gray-900" x-text="toast.title"></p>
+        <p class="text-sm text-gray-500" x-text="toast.message"></p>
+      </div>
+    </div>
+  </div>
 
-            <!-- Product Cards -->
-            <div class="p-6 flex-1 overflow-y-auto">
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                    <template x-for="product in filteredProducts" :key="product.id">
-                        <div @click="addToCart(product)" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md hover:border-blue-300 transition transform hover:-translate-y-1 flex flex-col">
-                            <div class="h-32 bg-gray-100 w-full flex-shrink-0 relative">
-                                <template x-if="product.image">
-                                    <img :src="product.image" class="w-full h-full object-cover">
-                                </template>
-                                <template x-if="!product.image">
-                                    <div class="w-full h-full flex items-center justify-center text-gray-400">
-                                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                    </div>
-                                </template>
-                            </div>
-                            <div class="p-3 flex flex-col flex-1 justify-between">
-                                <h3 class="text-sm font-bold text-gray-800 leading-tight mb-1" x-text="product.name"></h3>
-                                <p class="text-blue-600 font-bold" x-text="'₱' + product.price.toFixed(2)"></p>
-                            </div>
-                        </div>
-                    </template>
-                    <div x-show="filteredProducts.length === 0" class="col-span-full py-12 text-center text-gray-500">
-                        No products found. Switch to the Admin Panel to add some!
-                    </div>
-                </div>
+  <div x-cloak x-show="currentView === 'auth'" class="premium-bg min-h-screen page-enter">
+    <div class="mx-auto grid min-h-screen max-w-6xl grid-cols-1 gap-0 px-4 py-4 sm:px-6 lg:grid-cols-2 lg:px-0 lg:py-0">
+      <section class="flex flex-col justify-center px-0 py-8 sm:px-4 sm:py-10 lg:px-10">
+        <div class="max-w-xl">
+          <p class="mb-3 text-sm font-bold uppercase tracking-wide text-blue-600">Modern Local POS</p>
+          <h1 class="text-3xl font-black leading-tight text-gray-950 sm:text-5xl">Order, save, return, and keep every receipt.</h1>
+          <p class="mt-4 text-base leading-7 text-gray-600 sm:mt-5 sm:text-lg sm:leading-8">Create an account before ordering. Your cart and order history stay on this device, even after logout.</p>
+          <div class="mt-6 grid gap-3 sm:mt-8 sm:grid-cols-3">
+            <div class="soft-card rounded-2xl p-4 transition hover:-translate-y-1 hover:shadow-lg">
+              <p class="text-sm font-bold text-gray-900">Private access</p>
+              <p class="mt-1 text-sm text-gray-500">Users see ordering only.</p>
             </div>
+            <div class="soft-card rounded-2xl p-4 transition hover:-translate-y-1 hover:shadow-lg">
+              <p class="text-sm font-bold text-gray-900">Saved carts</p>
+              <p class="mt-1 text-sm text-gray-500">Return to unfinished orders.</p>
+            </div>
+            <div class="soft-card rounded-2xl p-4 transition hover:-translate-y-1 hover:shadow-lg">
+              <p class="text-sm font-bold text-gray-900">Admin role</p>
+              <p class="mt-1 text-sm text-gray-500">Dashboard opens only for admin login.</p>
+            </div>
+          </div>
         </div>
+      </section>
 
-        <!-- Right Side: Cart -->
-        <div class="w-full md:w-96 bg-white shadow-xl flex flex-col h-full border-t border-gray-200 md:border-t-0 md:border-l z-10">
-            <div class="p-4 bg-gray-50 border-b border-gray-200">
-                <h2 class="text-xl font-bold text-gray-800">Current Order</h2>
-                <p class="text-xs text-gray-500 mt-1" x-text="'Ticket: #' + Math.floor(Math.random() * 10000).toString().padStart(4, '0')"></p>
+      <section class="flex items-center justify-center px-0 py-4 sm:px-4 sm:py-10 lg:px-10">
+        <div class="glass-card mobile-tight w-full max-w-md rounded-3xl p-6">
+          <div class="mb-6 flex rounded-2xl bg-white/60 p-1 shadow-inner">
+            <button @click="setAuthMode('login')" :class="authMode === 'login' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-900'" class="flex-1 rounded-md px-4 py-2 text-sm font-bold transition">Login</button>
+            <button @click="setAuthMode('signup')" :class="authMode === 'signup' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-900'" class="flex-1 rounded-md px-4 py-2 text-sm font-bold transition">Sign Up</button>
+          </div>
+
+          <form x-show="authMode === 'login'" @submit.prevent="signIn()" class="space-y-4">
+            <div>
+              <h2 class="text-2xl font-black text-gray-950">Welcome back</h2>
+              <p class="mt-1 text-sm text-gray-500">Sign in to continue to your saved POS account.</p>
             </div>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium text-gray-700">Email</span>
+              <input type="email" x-model.trim="loginForm.email" required autocomplete="username" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium text-gray-700">Password</span>
+              <div class="relative">
+                <input :type="showLoginPassword ? 'text' : 'password'" x-model="loginForm.password" required autocomplete="current-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 pr-12 focus:outline-none">
+                <button type="button" @click="showLoginPassword = !showLoginPassword" class="password-toggle absolute right-2 top-1/2 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500" :aria-label="showLoginPassword ? 'Hide password' : 'Show password'">
+                  <svg x-show="!showLoginPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                  <svg x-show="showLoginPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.43A9.92 9.92 0 0 1 12 4.25c6 0 9.75 6.75 9.75 6.75a18.4 18.4 0 0 1-3.05 3.83M6.53 6.53C3.8 8.38 2.25 12 2.25 12S6 18.75 12 18.75c1.64 0 3.09-.5 4.33-1.23"/></svg>
+                </button>
+              </div>
+            </label>
+            <div class="-mt-2 flex justify-end">
+              <button type="button" @click="openForgotPassword()" class="no-hover-lift text-sm font-bold text-amber-800 hover:text-amber-900">
+                Forgot Password?
+              </button>
+            </div>
+            <p x-show="authError" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" x-text="authError"></p>
+            <button class="primary-btn w-full rounded-xl px-4 py-3 font-bold">Login</button>
+          </form>
 
-            <div class="flex-1 overflow-y-auto p-4 space-y-4">
-                <template x-for="(item, index) in cart" :key="index">
-                    <div class="flex justify-between items-center group">
-                        <div class="flex-1">
-                            <h4 class="text-sm font-semibold text-gray-800" x-text="item.name"></h4>
-                            <p class="text-xs text-gray-500" x-text="'₱' + item.price.toFixed(2)"></p>
-                        </div>
-                        <div class="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
-                            <button @click="decreaseQty(index)" class="w-6 h-6 flex items-center justify-center bg-white rounded text-red-500 font-bold hover:bg-gray-50 shadow-sm">-</button>
-                            <span class="text-sm font-bold w-4 text-center" x-text="item.quantity"></span>
-                            <button @click="increaseQty(index)" class="w-6 h-6 flex items-center justify-center bg-white rounded text-blue-500 font-bold hover:bg-gray-50 shadow-sm">+</button>
-                        </div>
-                        <div class="w-16 text-right ml-2">
-                            <p class="text-sm font-bold text-gray-900" x-text="'₱' + (item.price * item.quantity).toFixed(2)"></p>
-                        </div>
-                    </div>
+          <form x-show="authMode === 'signup'" @submit.prevent="signUp()" class="space-y-4">
+            <div>
+              <h2 class="text-2xl font-black text-gray-950">Create account</h2>
+              <p class="mt-1 text-sm text-gray-500">Make your customer account before ordering.</p>
+            </div>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium text-gray-700">Full Name</span>
+              <input type="text" x-model.trim="signupForm.name" required autocomplete="name" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium text-gray-700">Email</span>
+              <input type="email" x-model.trim="signupForm.email" required autocomplete="email" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-sm font-medium text-gray-700">Password</span>
+              <div class="relative">
+                <input :type="showSignupPassword ? 'text' : 'password'" x-model="signupForm.password" required minlength="4" autocomplete="new-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 pr-12 focus:outline-none">
+                <button type="button" @click="showSignupPassword = !showSignupPassword" class="password-toggle absolute right-2 top-1/2 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500" :aria-label="showSignupPassword ? 'Hide password' : 'Show password'">
+                  <svg x-show="!showSignupPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                  <svg x-show="showSignupPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.43A9.92 9.92 0 0 1 12 4.25c6 0 9.75 6.75 9.75 6.75a18.4 18.4 0 0 1-3.05 3.83M6.53 6.53C3.8 8.38 2.25 12 2.25 12S6 18.75 12 18.75c1.64 0 3.09-.5 4.33-1.23"/></svg>
+                </button>
+              </div>
+            </label>
+            <p x-show="authError" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" x-text="authError"></p>
+            <button class="secondary-btn w-full rounded-xl px-4 py-3 font-bold">Create Account</button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div x-cloak x-show="currentView === 'pos'" class="premium-bg page-enter flex min-h-screen flex-col xl:flex-row">
+    <main class="flex flex-1 flex-col">
+      <header class="glass-card m-3 rounded-3xl p-4 md:m-5">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="mobile-full flex flex-wrap items-center gap-3">
+            <h1 class="text-3xl font-black text-gray-900">Order Menu</h1>
+            <button x-show="currentUser?.role === 'admin'" @click="switchView('admin')" class="rounded-full border border-amber-200 bg-amber-50/90 px-4 py-2 text-sm font-bold text-amber-900 shadow-sm hover:border-amber-300 hover:bg-amber-100 hover:shadow-md">
+              Back to Dashboard
+            </button>
+            <div x-show="currentUser?.role !== 'admin'" class="rounded-full bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800" x-text="currentUser ? currentUser.name : ''"></div>
+            <button @click="signOut()" class="secondary-btn rounded-xl px-4 py-2 font-semibold">
+              Logout
+            </button>
+          </div>
+          <div class="flex gap-2 overflow-x-auto pb-1">
+            <button @click="activeCategory = 'All'"
+              :class="activeCategory === 'All' ? 'primary-btn' : 'ghost-btn hover:bg-white'"
+              class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold">
+              All
+            </button>
+            <template x-for="cat in categories" :key="cat.id">
+              <button @click="activeCategory = cat.name"
+                :class="activeCategory === cat.name ? 'primary-btn' : 'ghost-btn hover:bg-white'"
+                class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold"
+                x-text="cat.name">
+              </button>
+            </template>
+          </div>
+        </div>
+      </header>
+
+      <section class="flex-1 overflow-y-auto p-3 sm:p-5">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+          <template x-for="product in filteredProducts" :key="product.id">
+            <button @click="addToCart(product)" class="soft-card overflow-hidden rounded-3xl text-left transition hover:-translate-y-1 hover:shadow-xl">
+              <div class="flex h-36 items-center justify-center bg-stone-100 sm:h-40">
+                <template x-if="product.image">
+                  <img :src="product.image" class="h-full w-full object-cover" alt="">
                 </template>
-                <div x-show="cart.length === 0" class="text-center py-8 text-gray-400 text-sm">
-                    Tap items to add to order
-                </div>
-            </div>
-
-            <div class="p-4 bg-gray-50 border-t border-gray-200">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-gray-600">Subtotal</span>
-                    <span class="font-semibold text-gray-800" x-text="'₱' + cartTotal.toFixed(2)"></span>
-                </div>
-                <div class="flex justify-between items-center mb-6 pt-2 border-t border-gray-300">
-                    <span class="text-lg font-bold text-gray-900">Total</span>
-                    <span class="text-2xl font-bold text-blue-600" x-text="'₱' + cartTotal.toFixed(2)"></span>
-                </div>
-
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Customer Payment</label>
-                    <input type="number" x-model.number="customerMoney" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Enter amount paid">
-                </div>
-
-                <div x-show="customerMoney > 0" class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm font-medium text-green-800">Change:</span>
-                        <span class="text-lg font-bold text-green-600" x-text="'₱' + change.toFixed(2)"></span>
-                    </div>
-                </div>
-
-                <div class="flex space-x-2">
-                    <button @click="clearCart()" class="px-4 py-3 bg-red-100 text-red-600 font-bold rounded-lg hover:bg-red-200 transition">Clear</button>
-                    <button @click="checkout()" class="flex-1 bg-green-500 text-white font-bold text-lg py-3 rounded-lg hover:bg-green-600 shadow-md transition disabled:opacity-50" :disabled="cart.length === 0">Charge</button>
-                </div>
-                <div class="mt-2">
-                    <button @click="showOrderHistory()" class="w-full px-4 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition disabled:opacity-50" :disabled="!lastReceipt">Order History</button>
-                </div>
-            </div>
+                <template x-if="!product.image">
+                  <span class="text-sm font-semibold text-gray-400">No image</span>
+                </template>
+              </div>
+              <div class="p-3">
+                <h2 class="min-h-10 text-sm font-bold leading-tight text-gray-900" x-text="product.name"></h2>
+                <p class="mt-2 font-bold text-amber-700" x-text="formatMoney(product.price)"></p>
+              </div>
+            </button>
+          </template>
+          <div x-show="filteredProducts.length === 0" class="soft-card col-span-full rounded-3xl p-10 text-center text-gray-500">
+            No products are available yet.
+          </div>
         </div>
-    </div>
+      </section>
+    </main>
 
+    <aside class="glass-card m-3 flex w-auto flex-col rounded-3xl md:m-5 xl:sticky xl:top-5 xl:max-h-[calc(100vh-2.5rem)] xl:w-96">
+      <div class="border-b p-5">
+        <h2 class="text-xl font-bold text-gray-900">Current Order</h2>
+        <p class="mt-1 text-xs text-gray-500" x-text="'Ticket: #' + ticketNumber"></p>
+      </div>
 
-    <!-- ==========================================
-         VIEW 2: ADMIN INVENTORY 
-         ========================================== -->
-    <div x-cloak x-show="currentView === 'admin'" class="h-full w-full overflow-y-auto bg-gray-100 p-8">
-        
-        <div class="max-w-6xl mx-auto">
-            <div class="flex items-center justify-between mb-8">
-                <h1 class="text-3xl font-bold text-gray-900">Inventory Management</h1>
-                <button @click="switchView('pos')" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition shadow-sm">
-                    ⬅️ Back to Register
-                </button>
+      <div class="flex-1 space-y-4 overflow-y-auto p-4">
+        <template x-for="item in cart" :key="item.id">
+          <div class="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
+            <div class="min-w-0 flex-1">
+              <h3 class="truncate text-sm font-semibold text-gray-900" x-text="item.name"></h3>
+              <p class="text-xs text-gray-500" x-text="formatMoney(item.price)"></p>
             </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                
-                <!-- Add/Edit Form -->
-                <div class="bg-white p-6 rounded-lg shadow-md h-fit">
-                    <h2 class="text-xl font-semibold mb-4" x-text="isEditing ? 'Edit Product' : 'Add New Product'"></h2>
-                    <h2 class="text-xl font-semibold mb-4" x-text="isEditing ? 'Edit Product' : 'Add New Product'"></h2>
-                    <form @submit.prevent="saveProduct" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Product Image</label>
-                            <input type="file" accept="image/*" @change="handleImageUpload" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                            <template x-if="formData.image">
-                                <div class="mt-3 relative inline-block">
-                                    <img :src="formData.image" class="h-24 w-24 object-cover rounded-md border border-gray-200 shadow-sm">
-                                    <button type="button" @click="formData.image = null" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600">&times;</button>
-                                </div>
-                            </template>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Product Name</label>
-                            <input type="text" x-model="formData.name" required placeholder="e.g., Wintermelon Milk Tea" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Category</label>
-                            <div class="flex mt-1 space-x-2">
-                                <select x-model="formData.category" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500">
-                                    <option value="" disabled>Select a category</option>
-                                    <template x-for="cat in categories" :key="cat.id">
-                                        <option :value="cat.name" x-text="cat.name"></option>
-                                    </template>
-                                </select>
-                                <button type="button" @click="addNewCategory()" class="bg-gray-200 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-300 font-bold" title="Add New Category">+</button>
-                            </div>
-                            <div class="mt-3 grid grid-cols-2 gap-2">
-                                <template x-for="cat in categories" :key="cat.id">
-                                    <div class="flex items-center justify-between rounded-full bg-gray-100 px-3 py-2 text-sm text-gray-700">
-                                        <span x-text="cat.name"></span>
-                                        <button type="button" @click="deleteCategory(cat.id)" class="ml-2 text-gray-400 hover:text-red-600 font-bold">×</button>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700">Price (₱)</label>
-                            <input type="number" step="0.01" x-model="formData.price" required placeholder="0.00" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500">
-                        </div>
-                        <div class="flex space-x-3 pt-4">
-                            <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 font-medium transition" x-text="isEditing ? 'Update Item' : 'Save Item'"></button>
-                            <button type="button" x-show="isEditing" @click="resetForm()" class="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 font-medium transition">Cancel</button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="md:col-span-2 bg-white p-6 rounded-lg shadow-md">
-                    <h2 class="text-xl font-semibold mb-4">Current Menu</h2>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Image</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <template x-for="product in products" :key="product.id">
-                                    <tr class="hover:bg-gray-50 transition">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <template x-if="product.image"><img :src="product.image" class="h-10 w-10 object-cover rounded-md border"></template>
-                                            <template x-if="!product.image"><div class="h-10 w-10 bg-gray-100 rounded-md border flex items-center justify-center text-gray-400 text-xs">No img</div></template>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="product.name"></td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800" x-text="product.category"></span></td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold" x-text="'₱' + product.price.toFixed(2)"></td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button @click="editProduct(product)" class="text-indigo-600 hover:text-indigo-900 mr-4">Edit</button>
-                                            <button @click="deleteProduct(product.id)" class="text-red-600 hover:text-red-900">Delete</button>
-                                        </td>
-                                    </tr>
-                                </template>
-                                <tr x-show="products.length === 0">
-                                    <td colspan="5" class="px-6 py-8 text-center text-gray-500">No products found. Add some items!</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="col-span-full md:col-span-3 bg-white p-6 rounded-lg shadow-md">
-                    <h2 class="text-xl font-semibold mb-4">Sales History</h2>
-                    <div class="overflow-hidden">
-                        <table class="w-full text-sm divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                    <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                                    <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Paid</th>
-                                    <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Change</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <template x-for="sale in sales" :key="sale.id">
-                                    <tr class="hover:bg-gray-50 transition">
-                                        <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900" x-text="sale.id"></td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-500" x-text="new Date(sale.timestamp).toLocaleString()"></td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900" x-text="sale.items.length + ' item(s)'"></td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                                            <select x-model="sale.status" @change="updateSaleStatus(sale, sale.status)"
-                                                    :class="sale.status === 'Paid' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-yellow-100 text-yellow-800 border-yellow-300'"
-                                                    class="inline-block px-2 py-0.5 text-xs font-medium rounded-full border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                                <option value="Preparing">Preparing</option>
-                                                <option value="Paid">Paid</option>
-                                            </select>
-                                        </td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-xs font-semibold text-right text-gray-900" x-text="'₱' + sale.total.toFixed(2)"></td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-xs text-right text-gray-900" x-text="'₱' + sale.paid.toFixed(2)"></td>
-                                        <td class="px-3 py-2 whitespace-nowrap text-xs text-right text-gray-900" x-text="'₱' + sale.change.toFixed(2)"></td>
-                                    </tr>
-                                </template>
-                                <tr x-show="sales.length === 0">
-                                    <td colspan="7" class="px-3 py-4 text-center text-sm text-gray-500">No sales yet. Complete a charge from the POS to populate this list.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>            </div>
+            <div class="flex items-center gap-2 rounded-xl bg-stone-100 p-1">
+              <button @click="decreaseQty(item.id)" class="flex h-7 w-7 items-center justify-center rounded bg-white font-bold text-red-500 shadow-sm">-</button>
+              <span class="w-5 text-center text-sm font-bold" x-text="item.quantity"></span>
+              <button @click="increaseQty(item.id)" class="flex h-7 w-7 items-center justify-center rounded bg-white font-bold text-blue-500 shadow-sm">+</button>
+            </div>
+            <p class="ml-auto w-20 text-right text-sm font-bold" x-text="formatMoney(item.price * item.quantity)"></p>
+          </div>
+        </template>
+        <div x-show="cart.length === 0" class="rounded-2xl bg-white/60 py-10 text-center text-sm text-gray-400">
+          Tap items to add them here.
         </div>
-    </div>
+      </div>
 
-    <!-- ==========================================
-         VIEW 3: ORDER HISTORY 
-         ========================================== -->
-    <div x-cloak x-show="currentView === 'history'" class="h-full w-full overflow-y-auto bg-gray-100 p-8">
-        
-        <div class="max-w-6xl mx-auto">
-            <div class="flex items-center justify-between mb-8">
-                <h1 class="text-3xl font-bold text-gray-900">Order History</h1>
-                <button @click="backToPos()" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition shadow-sm">
-                    ⬅️ Back to Register
-                </button>
-            </div>
-
-            <div class="bg-white rounded-lg shadow-md">
-                <div class="p-6">
-                    <h2 class="text-2xl font-bold text-gray-900 mb-4">All Orders</h2>
-                    
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">#</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
-                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase">Items</th>
-                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase">Status</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">Total</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">Paid</th>
-                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-600 uppercase">Change</th>
-                                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                <template x-for="sale in allSales" :key="sale.id">
-                                    <tr class="hover:bg-gray-50 transition">
-                                        <td class="px-4 py-3 text-sm font-semibold text-gray-900" x-text="sale.id"></td>
-                                        <td class="px-4 py-3 text-sm text-gray-600" x-text="new Date(sale.timestamp).toLocaleString()"></td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 text-center" x-text="sale.items.length"></td>
-                                        <td class="px-4 py-3 text-center">
-                                            <span :class="sale.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
-                                                  class="inline-block px-3 py-1 text-xs font-semibold rounded-full">
-                                                <span x-text="sale.status"></span>
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-3 text-sm font-semibold text-right text-gray-900" x-text="'₱' + sale.total.toFixed(2)"></td>
-                                        <td class="px-4 py-3 text-sm text-right text-gray-600" x-text="'₱' + sale.paid.toFixed(2)"></td>
-                                        <td class="px-4 py-3 text-sm text-right text-gray-600" x-text="'₱' + sale.change.toFixed(2)"></td>
-                                        <td class="px-4 py-3 text-center">
-                                            <button @click="expandSaleDetails(sale.id)" class="text-blue-600 hover:text-blue-800 font-semibold text-sm">
-                                                <span x-text="expandedSaleId === sale.id ? '▼ Hide' : '▶ View'"></span>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <template x-if="expandedSaleId === sale.id">
-                                        <tr class="bg-gray-50">
-                                            <td colspan="8" class="px-4 py-4">
-                                                <div class="bg-white p-4 rounded-lg border border-gray-200">
-                                                    <h3 class="font-bold text-gray-900 mb-3">Order Details</h3>
-                                                    <div class="space-y-2 mb-4">
-                                                        <template x-for="item in sale.items" :key="item.id">
-                                                            <div class="flex justify-between items-center text-sm py-1 border-b border-gray-100">
-                                                                <span class="text-gray-700"><span x-text="item.name"></span> x <span x-text="item.quantity"></span></span>
-                                                                <span class="font-semibold text-gray-900" x-text="'₱' + (item.price * item.quantity).toFixed(2)"></span>
-                                                            </div>
-                                                        </template>
-                                                    </div>
-                                                    <div class="flex justify-end">
-                                                        <button @click="printReceipt(sale)" class="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition text-sm">
-                                                            🖨️ Print Receipt
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                </template>
-                                <tr x-show="allSales.length === 0">
-                                    <td colspan="8" class="px-4 py-8 text-center text-gray-500">No order history available.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+      <div class="border-t p-5">
+        <div class="mb-2 flex justify-between text-sm">
+          <span class="text-gray-600">Subtotal</span>
+          <span class="font-semibold" x-text="formatMoney(cartSubtotal)"></span>
         </div>
-    </div>
+        <div class="mb-2 flex justify-between text-sm">
+          <span class="text-gray-600">Discount</span>
+          <span class="font-semibold text-green-700" x-text="'-' + formatMoney(discountAmount)"></span>
+        </div>
+        <div class="mb-4 flex justify-between border-t pt-3">
+          <span class="text-lg font-bold">Total</span>
+          <span class="text-2xl font-bold text-amber-700" x-text="formatMoney(cartTotal)"></span>
+        </div>
 
-    <!-- ==========================================
-         UNIFIED APP LOGIC 
-         ========================================== -->
-    <script>
-        // Global Database Setup
-        const db = new Dexie("POS_LocalDB");
-        db.version(3).stores({
-            products: '++id, name, category, price', 
-            categories: '++id, name',
-            sales: '++id, timestamp, total, paid, change'
-        });
-        db.version(4).stores({
-            products: '++id, name, category, price', 
-            categories: '++id, name',
-            sales: '++id, timestamp, total, paid, change, status'
-        }).upgrade(async tx => {
-            await tx.table('sales').toCollection().modify(sale => {
-                if (!('status' in sale)) sale.status = 'Paid';
+        <label class="mb-4 block">
+          <span class="mb-1 block text-sm font-medium text-gray-700">Customer Payment</span>
+          <input type="number" min="0" step="0.01" x-model.number="customerMoney" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none" placeholder="Enter amount paid">
+        </label>
+
+        <div x-show="customerMoney > 0" class="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
+          <div class="flex justify-between">
+            <span class="text-sm font-medium text-green-800">Change</span>
+            <span class="font-bold text-green-700" x-text="formatMoney(change)"></span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-[auto_1fr] gap-2">
+          <button @click="clearCart()" class="rounded-xl bg-red-100 px-4 py-3 font-bold text-red-700 transition hover:bg-red-200">Clear</button>
+          <button @click="checkout()" :disabled="cart.length === 0" class="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-lg font-bold text-white shadow-md transition hover:bg-emerald-700 disabled:opacity-50">Charge</button>
+        </div>
+        <button @click="showOrderHistory()" class="primary-btn mt-2 w-full rounded-xl px-4 py-3 font-bold">
+          Order History
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <div x-cloak x-show="currentView === 'admin'" class="premium-bg page-enter min-h-screen p-3 sm:p-4 md:p-8">
+    <div class="mx-auto max-w-6xl">
+      <div class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p class="mt-1 text-sm text-gray-500" x-text="currentUser ? 'Signed in as ' + currentUser.email : ''"></p>
+        </div>
+        <div class="mobile-full flex flex-wrap gap-3">
+          <button @click="switchView('pos')" class="primary-btn rounded-xl px-6 py-3 font-bold">
+            Ordering Page
+          </button>
+          <button @click="signOut()" class="secondary-btn rounded-xl px-6 py-3 font-bold">
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
+        <section class="soft-card mobile-tight h-fit rounded-3xl p-6">
+          <h2 class="mb-4 text-xl font-semibold" x-text="isEditing ? 'Edit Product' : 'Add New Product'"></h2>
+          <form @submit.prevent="saveProduct" class="space-y-4">
+            <label class="block">
+              <span class="block text-sm font-medium text-gray-700">Product Image</span>
+              <input type="file" accept="image/*" @change="handleImageUpload" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded-xl file:border-0 file:bg-amber-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-amber-800 hover:file:bg-amber-100">
+            </label>
+            <template x-if="formData.image">
+              <div class="relative inline-block">
+                <img :src="formData.image" class="h-24 w-24 rounded-md border object-cover shadow-sm" alt="">
+                <button type="button" @click="formData.image = null" class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white">&times;</button>
+              </div>
+            </template>
+
+            <label class="block">
+              <span class="block text-sm font-medium text-gray-700">Product Name</span>
+              <input type="text" x-model.trim="formData.name" required placeholder="e.g., Wintermelon Milk Tea" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
+            </label>
+
+            <div>
+              <span class="block text-sm font-medium text-gray-700">Category</span>
+              <div class="mt-1 flex gap-2">
+                <select x-model="formData.category" required class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
+                  <option value="" disabled>Select a category</option>
+                  <template x-for="cat in categories" :key="cat.id">
+                    <option :value="cat.name" x-text="cat.name"></option>
+                  </template>
+                </select>
+                <button type="button" @click="addNewCategory()" class="ghost-btn rounded-xl px-4 py-2 font-bold" title="Add category">+</button>
+              </div>
+              <div class="mt-3 grid grid-cols-2 gap-2">
+                <template x-for="cat in categories" :key="cat.id">
+                  <div class="flex items-center justify-between rounded-full bg-stone-100 px-3 py-2 text-sm text-gray-700">
+                    <span class="truncate" x-text="cat.name"></span>
+                    <button type="button" @click="deleteCategory(cat.id)" class="ml-2 font-bold text-gray-400 hover:text-red-600">&times;</button>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <label class="block">
+              <span class="block text-sm font-medium text-gray-700">Price</span>
+              <input type="number" min="0" step="0.01" x-model="formData.price" required placeholder="0.00" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
+            </label>
+
+            <div class="grid gap-3 pt-2 sm:grid-cols-2">
+              <button type="submit" class="primary-btn flex-1 rounded-xl px-4 py-3 font-bold" x-text="isEditing ? 'Update Item' : 'Save Item'"></button>
+              <button type="button" x-show="isEditing" @click="resetForm()" class="ghost-btn flex-1 rounded-xl px-4 py-3 font-bold">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="soft-card mobile-tight rounded-3xl p-6 lg:col-span-2">
+          <h2 class="mb-4 text-xl font-semibold">Current Menu</h2>
+          <div class="table-scroll overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Image</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Category</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Price</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 bg-white">
+                <template x-for="product in products" :key="product.id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                      <template x-if="product.image"><img :src="product.image" class="h-10 w-10 rounded-md border object-cover" alt=""></template>
+                      <template x-if="!product.image"><div class="flex h-10 w-10 items-center justify-center rounded-md border bg-gray-100 text-xs text-gray-400">No img</div></template>
+                    </td>
+                    <td class="px-4 py-3 font-medium text-gray-900" x-text="product.name"></td>
+                    <td class="px-4 py-3"><span class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800" x-text="product.category"></span></td>
+                    <td class="px-4 py-3 font-semibold" x-text="formatMoney(product.price)"></td>
+                    <td class="px-4 py-3 text-right">
+                      <button @click="editProduct(product)" class="mr-4 font-medium text-indigo-600 hover:text-indigo-900">Edit</button>
+                      <button @click="deleteProduct(product.id)" class="font-medium text-red-600 hover:text-red-900">Delete</button>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="products.length === 0">
+                  <td colspan="5" class="px-4 py-8 text-center text-gray-500">No products found. Add some items.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="soft-card mobile-tight rounded-3xl p-6 lg:col-span-3">
+          <div class="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 class="text-xl font-semibold">Discount</h2>
+              <p class="text-sm text-gray-500">Applied to new register orders.</p>
+            </div>
+            <form @submit.prevent="saveDiscount()" class="grid gap-2 sm:grid-cols-[160px_160px_auto]">
+              <select x-model="discountForm.type" class="rounded-xl border border-gray-300 px-3 py-3">
+                <option value="percent">Percent</option>
+                <option value="fixed">Fixed amount</option>
+              </select>
+              <input type="number" min="0" step="0.01" x-model.number="discountForm.value" class="rounded-xl border border-gray-300 px-3 py-3">
+              <button class="rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white hover:bg-emerald-700">Save Discount</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="soft-card mobile-tight rounded-3xl p-6 lg:col-span-3">
+          <h2 class="mb-4 text-xl font-semibold">Sales History</h2>
+          <div class="table-scroll overflow-x-auto">
+            <table class="min-w-[1080px] w-full divide-y divide-gray-200 text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">#</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Date</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Customer</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Items</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500">Total</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Payment Status</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Order Status</th>
+                  <th class="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500">Details</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 bg-white">
+                <template x-for="sale in sales" :key="sale.id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 font-semibold" x-text="sale.id"></td>
+                    <td class="px-3 py-2 text-gray-500" x-text="formatDate(sale.timestamp)"></td>
+                    <td class="px-3 py-2 text-gray-600" x-text="sale.customerName || 'Guest'"></td>
+                    <td class="px-3 py-2" x-text="sale.items.length + ' item(s)'"></td>
+                    <td class="px-3 py-2 text-right font-bold" x-text="formatMoney(sale.total)"></td>
+                    <td class="px-3 py-2">
+                      <select x-model="sale.paymentStatus" @change="updateSale(sale)" class="rounded-xl border border-gray-300 px-2 py-1">
+                        <option>Paid</option>
+                        <option>Unpaid</option>
+                      </select>
+                    </td>
+                    <td class="px-3 py-2">
+                      <select x-model="sale.orderStatus" @change="updateSale(sale)" class="rounded-xl border border-gray-300 px-2 py-1">
+                        <option>Preparing</option>
+                        <option>Served</option>
+                      </select>
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                      <button @click="showSaleDetails(sale)" class="font-semibold text-blue-600 hover:text-blue-800">View</button>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="sales.length === 0">
+                  <td colspan="8" class="px-3 py-8 text-center text-gray-500">No sales yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div x-cloak x-show="currentView === 'history'" class="premium-bg page-enter min-h-screen p-3 sm:p-4 md:p-8">
+    <div class="mx-auto max-w-6xl">
+      <div class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900">Order History</h1>
+          <p class="mt-1 text-sm text-gray-500" x-text="currentUser ? 'Saved for ' + currentUser.name : ''"></p>
+        </div>
+        <div class="mobile-full flex flex-wrap gap-3">
+          <button @click="backToPos()" class="primary-btn rounded-xl px-6 py-3 font-bold">
+            Back to Ordering
+          </button>
+          <button @click="signOut()" class="secondary-btn rounded-xl px-6 py-3 font-bold">
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <section class="soft-card mobile-tight rounded-3xl p-6">
+        <h2 class="mb-4 text-2xl font-bold text-gray-900">All Orders</h2>
+        <div class="table-scroll overflow-x-auto">
+          <table class="min-w-[900px] w-full text-sm">
+            <thead class="border-b bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600">#</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600">Date</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600">Items</th>
+                <th class="px-4 py-3 text-center text-xs font-medium uppercase text-gray-600">Payment</th>
+                <th class="px-4 py-3 text-center text-xs font-medium uppercase text-gray-600">Order</th>
+                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-600">Total</th>
+                <th class="px-4 py-3 text-center text-xs font-medium uppercase text-gray-600">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <template x-for="sale in allSales" :key="sale.id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 font-semibold" x-text="sale.id"></td>
+                  <td class="px-4 py-3 text-gray-600" x-text="formatDate(sale.timestamp)"></td>
+                  <td class="px-4 py-3 text-gray-700">
+                    <template x-for="item in sale.items" :key="item.id">
+                      <div><span x-text="item.name"></span> x <span x-text="item.quantity"></span></div>
+                    </template>
+                  </td>
+                  <td class="px-4 py-3 text-center"><span :class="badgeClass(sale.paymentStatus)" class="inline-block rounded-full px-3 py-1 text-xs font-semibold" x-text="sale.paymentStatus"></span></td>
+                  <td class="px-4 py-3 text-center"><span :class="badgeClass(sale.orderStatus)" class="inline-block rounded-full px-3 py-1 text-xs font-semibold" x-text="sale.orderStatus"></span></td>
+                  <td class="px-4 py-3 text-right font-semibold" x-text="formatMoney(sale.total)"></td>
+                  <td class="px-4 py-3 text-center">
+                    <button @click="showSaleDetails(sale)" class="mr-4 font-semibold text-blue-600 hover:text-blue-800">View</button>
+                    <button @click="printReceipt(sale)" class="font-semibold text-green-600 hover:text-green-800">Print</button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="allSales.length === 0">
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">No order history available.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div x-cloak x-show="selectedSale" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4" @keydown.escape.window="closeSaleDetails()">
+    <div class="glass-card mobile-safe-modal mobile-tight w-full max-w-lg rounded-3xl p-6">
+      <div class="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-900">Order Details #<span x-text="selectedSale?.id"></span></h2>
+          <p class="mt-1 text-sm text-gray-500" x-text="selectedSale ? formatDate(selectedSale.timestamp) : ''"></p>
+          <p class="mt-1 text-sm font-semibold text-gray-700" x-show="selectedSale?.customerName" x-text="selectedSale?.customerName"></p>
+        </div>
+        <button @click="closeSaleDetails()" class="ghost-btn rounded-xl px-3 py-1 text-xl font-bold leading-none text-gray-500">&times;</button>
+      </div>
+      <div class="max-h-80 space-y-3 overflow-y-auto">
+        <template x-for="item in selectedSale?.items || []" :key="item.id">
+          <div class="flex items-center justify-between gap-4 border-b border-gray-200 pb-3 text-sm">
+            <div>
+              <p class="font-semibold text-gray-900" x-text="item.name"></p>
+              <p class="text-gray-500"><span x-text="formatMoney(item.price)"></span> x <span x-text="item.quantity"></span></p>
+            </div>
+            <p class="font-bold text-gray-900" x-text="formatMoney(item.price * item.quantity)"></p>
+          </div>
+        </template>
+      </div>
+      <div class="mt-5 space-y-2 border-t pt-4 text-sm">
+        <div class="flex justify-between"><span class="text-gray-600">Subtotal</span><span class="font-semibold" x-text="formatMoney(selectedSale?.subtotal || selectedSale?.total)"></span></div>
+        <div class="flex justify-between"><span class="text-gray-600">Discount</span><span class="font-semibold text-green-700" x-text="'-' + formatMoney(selectedSale?.discountAmount || 0)"></span></div>
+        <div class="flex justify-between text-lg"><span class="font-bold">Total</span><span class="font-bold text-amber-700" x-text="formatMoney(selectedSale?.total)"></span></div>
+      </div>
+      <div class="mt-5 flex flex-col justify-end gap-3 sm:flex-row">
+        <button @click="closeSaleDetails()" class="ghost-btn rounded-xl px-4 py-2 text-sm font-bold">Close</button>
+        <button @click="printReceipt(selectedSale)" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Print Receipt</button>
+      </div>
+    </div>
+  </div>
+
+  <div x-cloak x-show="showForgotPassword" class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4" @keydown.escape.window="closeForgotPassword()">
+    <div x-show="showForgotPassword" x-transition class="glass-card mobile-safe-modal mobile-tight w-full max-w-md rounded-3xl p-6">
+      <div class="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <p class="text-sm font-bold uppercase tracking-wide text-amber-700">Account Recovery</p>
+          <h2 class="mt-1 text-2xl font-black text-gray-950">Reset password</h2>
+          <p class="mt-1 text-sm text-gray-500" x-text="forgotPassword.step === 'lookup' ? 'Enter your registered email to find your account.' : 'Create a new password for your account.'"></p>
+        </div>
+        <button type="button" @click="closeForgotPassword()" class="ghost-btn rounded-xl px-3 py-1 text-xl font-bold leading-none text-gray-500">&times;</button>
+      </div>
+
+      <form x-show="forgotPassword.step === 'lookup'" @submit.prevent="findResetAccount()" class="space-y-4">
+        <label class="block">
+          <span class="mb-1 block text-sm font-medium text-gray-700">Email</span>
+          <input type="email" x-model.trim="forgotPassword.email" required autocomplete="username" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none" placeholder="you@example.com">
+        </label>
+        <p x-show="forgotPassword.error" class="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" x-text="forgotPassword.error"></p>
+        <button class="primary-btn w-full rounded-xl px-4 py-3 font-bold">Find Account</button>
+      </form>
+
+      <form x-show="forgotPassword.step === 'reset'" @submit.prevent="resetPassword()" class="space-y-4">
+        <div class="rounded-2xl bg-amber-50 px-4 py-3">
+          <p class="text-sm font-bold text-amber-900" x-text="forgotPassword.userName"></p>
+          <p class="text-xs text-amber-700" x-text="forgotPassword.email"></p>
+        </div>
+        <label class="block">
+          <span class="mb-1 block text-sm font-medium text-gray-700">New Password</span>
+          <div class="relative">
+            <input :type="showResetPassword ? 'text' : 'password'" x-model="forgotPassword.newPassword" required minlength="4" autocomplete="new-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 pr-12 focus:outline-none">
+            <button type="button" @click="showResetPassword = !showResetPassword" class="password-toggle absolute right-2 top-1/2 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500" :aria-label="showResetPassword ? 'Hide password' : 'Show password'">
+              <svg x-show="!showResetPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+              <svg x-show="showResetPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.43A9.92 9.92 0 0 1 12 4.25c6 0 9.75 6.75 9.75 6.75a18.4 18.4 0 0 1-3.05 3.83M6.53 6.53C3.8 8.38 2.25 12 2.25 12S6 18.75 12 18.75c1.64 0 3.09-.5 4.33-1.23"/></svg>
+            </button>
+          </div>
+        </label>
+        <label class="block">
+          <span class="mb-1 block text-sm font-medium text-gray-700">Confirm Password</span>
+          <div class="relative">
+            <input :type="showConfirmResetPassword ? 'text' : 'password'" x-model="forgotPassword.confirmPassword" required minlength="4" autocomplete="new-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 pr-12 focus:outline-none">
+            <button type="button" @click="showConfirmResetPassword = !showConfirmResetPassword" class="password-toggle absolute right-2 top-1/2 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500" :aria-label="showConfirmResetPassword ? 'Hide password' : 'Show password'">
+              <svg x-show="!showConfirmResetPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+              <svg x-show="showConfirmResetPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.43A9.92 9.92 0 0 1 12 4.25c6 0 9.75 6.75 9.75 6.75a18.4 18.4 0 0 1-3.05 3.83M6.53 6.53C3.8 8.38 2.25 12 2.25 12S6 18.75 12 18.75c1.64 0 3.09-.5 4.33-1.23"/></svg>
+            </button>
+          </div>
+        </label>
+        <p x-show="forgotPassword.error" class="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" x-text="forgotPassword.error"></p>
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <button type="button" @click="forgotPassword.step = 'lookup'; forgotPassword.error = ''" class="ghost-btn rounded-xl px-4 py-3 font-bold sm:w-36">Back</button>
+          <button class="primary-btn flex-1 rounded-xl px-4 py-3 font-bold">Reset Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const db = new Dexie("POS_LocalDB");
+    db.version(6).stores({
+      products: "++id, name, category, price",
+      categories: "++id, name",
+      sales: "++id, userId, timestamp, total, paid, change, paymentStatus, orderStatus",
+      users: "++id, &email, role",
+      settings: "&key"
+    });
+
+    function posApp() {
+      return {
+        currentView: "auth",
+        currentUser: null,
+        authMode: "login",
+        loginForm: { email: "", password: "" },
+        signupForm: { name: "", email: "", password: "" },
+        authError: "",
+        showLoginPassword: false,
+        showSignupPassword: false,
+        showResetPassword: false,
+        showConfirmResetPassword: false,
+        showForgotPassword: false,
+        forgotPassword: {
+          step: "lookup",
+          email: "",
+          userId: null,
+          userName: "",
+          newPassword: "",
+          confirmPassword: "",
+          error: ""
+        },
+        toast: { show: false, title: "", message: "" },
+        products: [],
+        categories: [],
+        sales: [],
+        allSales: [],
+        formData: { id: null, name: "", category: "", price: "", image: null },
+        isEditing: false,
+        cart: [],
+        activeCategory: "All",
+        customerMoney: 0,
+        lastReceipt: null,
+        selectedSale: null,
+        ticketNumber: "0000",
+        discount: { type: "percent", value: 0 },
+        discountForm: { type: "percent", value: 0 },
+        adminCredentials: { name: "Administrator", email: "admin@pos.local", password: "admin123", role: "admin" },
+
+        async initApp() {
+          this.ticketNumber = this.generateTicket();
+          await this.seedDefaults();
+          await this.seedAdminAccount();
+          await this.loadSettings();
+          await this.loadCategories();
+          await this.loadProducts();
+          await this.restoreSession();
+        },
+
+        async seedDefaults() {
+          const catCount = await db.categories.count();
+          if (catCount === 0) {
+            await db.categories.bulkAdd([
+              { name: "Burgers" },
+              { name: "Drinks" },
+              { name: "Sides" }
+            ]);
+          }
+
+          const productCount = await db.products.count();
+          if (productCount === 0) {
+            await db.products.bulkAdd([
+              { name: "Classic Burger", category: "Burgers", price: 120, image: null },
+              { name: "Cheese Burger", category: "Burgers", price: 145, image: null },
+              { name: "Fries", category: "Sides", price: 65, image: null },
+              { name: "Iced Tea", category: "Drinks", price: 45, image: null }
+            ]);
+          }
+        },
+
+        async seedAdminAccount() {
+          const admin = await db.users.where("email").equals(this.adminCredentials.email).first();
+          if (!admin) {
+            await db.users.add({
+              name: this.adminCredentials.name,
+              email: this.adminCredentials.email,
+              password: this.adminCredentials.password,
+              role: this.adminCredentials.role,
+              createdAt: new Date().toISOString()
             });
-        });
+          } else {
+            await db.users.update(admin.id, {
+              name: this.adminCredentials.name,
+              password: this.adminCredentials.password,
+              role: this.adminCredentials.role
+            });
+          }
+        },
 
-        function posApp() {
-            return {
-                // --- STATE MANAGEMENT ---
-                currentView: 'pos', // 'pos' or 'admin' or 'history'
-                products: [],
-                categories: [],
-                sales: [],
-                
-                // --- ADMIN STATE ---
-                formData: { id: null, name: '', category: '', price: '', image: null },
-                isEditing: false,
+        async restoreSession() {
+          const storedUserId = Number(localStorage.getItem("posCurrentUserId") || 0);
+          if (!storedUserId) {
+            this.currentView = "auth";
+            return;
+          }
 
-                // --- POS STATE ---
-                cart: [],
-                activeCategory: 'All',
-                customerMoney: 0,
-                lastReceipt: null,
-                allSales: [],
-                expandedSaleId: null,
-                statusPollInterval: null,
+          const user = await db.users.get(storedUserId);
+          if (!user) {
+            localStorage.removeItem("posCurrentUserId");
+            this.currentView = "auth";
+            return;
+          }
 
-                // --- INITIALIZATION ---
-                async initApp() {
-                    const catCount = await db.categories.count();
-                    if (catCount === 0) {
-                        await db.categories.bulkAdd([
-                            { name: 'Burgers' }, { name: 'Drinks' }, { name: 'Sides' }
-                        ]);
-                    }
-                    this.loadCategories();
-                    this.loadProducts();
-                    this.loadSales();
-                    this.startStatusPolling();
-                },
+          await this.enterUserSession(user);
+        },
 
-                switchView(view) {
-                    this.currentView = view;
-                    if(view === 'pos') {
-                        this.loadProducts(); // Ensure POS has fresh data when returning from Admin
-                    }
-                    if(view === 'admin') {
-                        this.loadSales();
-                    }
-                },
+        setAuthMode(mode) {
+          this.authMode = mode;
+          this.authError = "";
+          this.showLoginPassword = false;
+          this.showSignupPassword = false;
+        },
 
-                // --- SHARED DATA FETCHING ---
-                async loadCategories() {
-                    this.categories = await db.categories.orderBy('name').toArray();
-                },
-                async loadProducts() {
-                    this.products = await db.products.reverse().toArray();
-                },
-                async loadSales() {
-                    this.sales = await db.sales.orderBy('timestamp').reverse().toArray();
-                    this.allSales = this.sales; // Keep a copy for history view
-                },
-                async updateSaleStatus(sale, status) {
-                    await db.sales.update(sale.id, { status });
-                    sale.status = status;
-                    
-                    // Update in allSales array for real-time sync
-                    const saleIndex = this.allSales.findIndex(s => s.id === sale.id);
-                    if (saleIndex > -1) {
-                        this.allSales[saleIndex].status = status;
-                    }
-                    
-                    // Update lastReceipt if it's the same sale
-                    if (this.lastReceipt && this.lastReceipt.id === sale.id) {
-                        this.lastReceipt.status = status;
-                    }
-                },
+        showToast(title, message) {
+          this.toast = { show: true, title, message };
+          window.clearTimeout(this.toastTimer);
+          this.toastTimer = window.setTimeout(() => {
+            this.toast.show = false;
+          }, 2600);
+        },
 
-                // --- ADMIN FUNCTIONS ---
-                handleImageUpload(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (e) => { this.formData.image = e.target.result; };
-                    reader.readAsDataURL(file);
-                },
+        openForgotPassword() {
+          this.authError = "";
+          this.showForgotPassword = true;
+          this.forgotPassword = {
+            step: "lookup",
+            email: this.loginForm.email.trim().toLowerCase(),
+            userId: null,
+            userName: "",
+            newPassword: "",
+            confirmPassword: "",
+            error: ""
+          };
+          this.showResetPassword = false;
+          this.showConfirmResetPassword = false;
+        },
 
-                async addNewCategory() {
-                    const newCat = prompt("Enter the name of the new category:");
-                    if (newCat && newCat.trim() !== '') {
-                        const trimmedName = newCat.trim();
-                        await db.categories.add({ name: trimmedName });
-                        await this.loadCategories(); 
-                        this.formData.category = trimmedName; 
-                    }
-                },
+        closeForgotPassword() {
+          this.showForgotPassword = false;
+          this.forgotPassword = {
+            step: "lookup",
+            email: "",
+            userId: null,
+            userName: "",
+            newPassword: "",
+            confirmPassword: "",
+            error: ""
+          };
+          this.showResetPassword = false;
+          this.showConfirmResetPassword = false;
+        },
 
-                async deleteCategory(id) {
-                    const categoryToRemove = this.categories.find(cat => cat.id === id);
-                    if (!categoryToRemove) return;
-                    if (!confirm(`Delete category '${categoryToRemove.name}'?`)) return;
-                    await db.categories.delete(id);
-                    await this.loadCategories();
-                },
+        async findResetAccount() {
+          const email = this.forgotPassword.email.trim().toLowerCase();
+          if (!email) {
+            this.forgotPassword.error = "Enter your registered email address.";
+            return;
+          }
 
-                async saveProduct() {
-                    const priceAsNumber = parseFloat(this.formData.price);
-                    if (this.isEditing) {
-                        await db.products.update(this.formData.id, {
-                            name: this.formData.name, category: this.formData.category, 
-                            price: priceAsNumber, image: this.formData.image
-                        });
-                    } else {
-                        await db.products.add({
-                            name: this.formData.name, category: this.formData.category, 
-                            price: priceAsNumber, image: this.formData.image
-                        });
-                    }
-                    this.resetForm();
-                    this.loadProducts();
-                },
+          const user = await db.users.where("email").equals(email).first();
+          if (!user) {
+            this.forgotPassword.error = "No account was found with that email.";
+            return;
+          }
 
-                editProduct(product) {
-                    this.formData = { ...product }; 
-                    this.isEditing = true;
-                },
+          this.forgotPassword = {
+            ...this.forgotPassword,
+            step: "reset",
+            email,
+            userId: user.id,
+            userName: user.name,
+            newPassword: "",
+            confirmPassword: "",
+            error: ""
+          };
+        },
 
-                async deleteProduct(id) {
-                    if (confirm('Are you sure you want to delete this item?')) {
-                        await db.products.delete(id);
-                        this.loadProducts();
-                    }
-                },
+        async resetPassword() {
+          const password = this.forgotPassword.newPassword;
+          const confirm = this.forgotPassword.confirmPassword;
 
-                resetForm() {
-                    this.formData = { id: null, name: '', category: '', price: '', image: null };
-                    this.isEditing = false;
-                    const fileInput = document.querySelector('input[type="file"]');
-                    if(fileInput) fileInput.value = '';
-                },
+          if (!this.forgotPassword.userId) {
+            this.forgotPassword.error = "Please find your account first.";
+            return;
+          }
+          if (password.length < 4) {
+            this.forgotPassword.error = "Password must be at least 4 characters.";
+            return;
+          }
+          if (password !== confirm) {
+            this.forgotPassword.error = "Passwords do not match.";
+            return;
+          }
 
-                // --- POS REGISTER FUNCTIONS ---
-                get filteredProducts() {
-                    if (this.activeCategory === 'All') return this.products;
-                    return this.products.filter(p => p.category === this.activeCategory);
-                },
+          const user = await db.users.get(this.forgotPassword.userId);
+          if (!user || user.email !== this.forgotPassword.email) {
+            this.forgotPassword.error = "Account could not be verified. Please try again.";
+            return;
+          }
 
-                get cartTotal() {
-                    return this.cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-                },
+          await db.users.update(user.id, { password });
+          this.loginForm = { email: user.email, password: "" };
+          this.authMode = "login";
+          this.closeForgotPassword();
+          this.showToast("Password reset successfully!", "Sign in with your new password.");
+        },
 
-                get change() {
-                    return Math.max(0, this.customerMoney - this.cartTotal);
-                },
+        async signUp() {
+          const name = this.signupForm.name.trim();
+          const email = this.signupForm.email.trim().toLowerCase();
+          const password = this.signupForm.password;
 
-                addToCart(product) {
-                    const existingItemIndex = this.cart.findIndex(item => item.id === product.id);
-                    if (existingItemIndex > -1) {
-                        this.cart[existingItemIndex].quantity += 1;
-                    } else {
-                        this.cart.push({ id: product.id, name: product.name, price: product.price, quantity: 1 });
-                    }
-                },
+          if (!name || !email || password.length < 4) {
+            this.authError = "Please enter your name, email, and a password with at least 4 characters.";
+            return;
+          }
 
-                increaseQty(index) { this.cart[index].quantity += 1; },
-                decreaseQty(index) {
-                    if (this.cart[index].quantity > 1) { this.cart[index].quantity -= 1; } 
-                    else { this.cart.splice(index, 1); }
-                },
+          const existing = await db.users.where("email").equals(email).first();
+          if (existing) {
+            this.authError = "An account with this email already exists.";
+            return;
+          }
 
-                clearCart() {
-                    if(confirm("Clear current order?")) {
-                        this.cart = [];
-                        this.customerMoney = 0;
-                    }
-                },
+          const id = await db.users.add({
+            name,
+            email,
+            password,
+            role: "customer",
+            createdAt: new Date().toISOString()
+          });
 
-                showOrderHistory() {
-                    this.loadSales(); // Refresh all sales before showing history
-                    this.currentView = 'history';
-                },
+          this.loginForm.email = email;
+          this.signupForm = { name: "", email: "", password: "" };
+          this.showSignupPassword = false;
+          this.showToast("Account created successfully!", "You can now sign in and start ordering.");
+          window.setTimeout(() => {
+            this.authMode = "login";
+          }, 900);
+        },
 
-                backToPos() {
-                    this.currentView = 'pos';
-                },
+        async signIn() {
+          const email = this.loginForm.email.trim().toLowerCase();
+          const password = this.loginForm.password;
+          const user = await db.users.where("email").equals(email).first();
 
-                expandSaleDetails(saleId) {
-                    this.expandedSaleId = this.expandedSaleId === saleId ? null : saleId;
-                },
+          if (!user || user.password !== password) {
+            this.authError = "Invalid email or password.";
+            return;
+          }
 
-                async startStatusPolling() {
-                    // Poll every 3 seconds for status updates
-                    this.statusPollInterval = setInterval(async () => {
-                        if (this.currentView === 'history' && this.allSales.length > 0) {
-                            await this.loadSales();
-                        }
-                    }, 3000);
-                },
+          this.loginForm = { email: "", password: "" };
+          await this.enterUserSession(user);
+        },
 
-                stopStatusPolling() {
-                    if (this.statusPollInterval) {
-                        clearInterval(this.statusPollInterval);
-                        this.statusPollInterval = null;
-                    }
-                },
+        async enterUserSession(user) {
+          this.currentUser = user;
+          this.authError = "";
+          localStorage.setItem("posCurrentUserId", String(user.id));
+          await this.loadUserCart();
+          await this.loadSales();
+          this.currentView = user.role === "admin" ? "admin" : "pos";
+        },
 
-                async checkout() {
-                    if(this.cart.length === 0) return;
-                    if(this.customerMoney < this.cartTotal) {
-                        alert('Insufficient payment amount!');
-                        return;
-                    }
+        async signOut() {
+          await this.saveUserCart();
+          localStorage.removeItem("posCurrentUserId");
+          this.currentUser = null;
+          this.cart = [];
+          this.customerMoney = 0;
+          this.sales = [];
+          this.allSales = [];
+          this.selectedSale = null;
+          this.currentView = "auth";
+        },
 
-                    const saleRecord = {
-                        items: this.cart.map(item => ({ ...item })),
-                        total: this.cartTotal,
-                        paid: this.customerMoney,
-                        change: this.change,
-                        status: 'Paid',
-                        timestamp: new Date().toISOString()
-                    };
+        switchView(view) {
+          if (!this.currentUser) {
+            this.currentView = "auth";
+            return;
+          }
+          if (view === "admin" && this.currentUser.role !== "admin") {
+            this.currentView = "pos";
+            return;
+          }
 
-                    this.lastReceipt = { ...saleRecord };
-                    await db.sales.add(saleRecord);
-                    await this.loadSales();
+          this.currentView = view;
+          if (view === "pos") this.loadProducts();
+          if (view === "admin" || view === "history") this.loadSales();
+        },
 
-                    this.cart = [];
-                    this.customerMoney = 0;
-                },
+        async loadSettings() {
+          const storedDiscount = await db.settings.get("discount");
+          this.discount = storedDiscount ? storedDiscount.value : { type: "percent", value: 0 };
+          this.discountForm = { ...this.discount };
+        },
 
-                printReceipt(transaction = null) {
-                    const receiptData = transaction || this.lastReceipt;
-                    if (!receiptData || !receiptData.items || receiptData.items.length === 0) {
-                        alert('No receipt available to print.');
-                        return;
-                    }
+        async saveDiscount() {
+          const cleanValue = Math.max(0, Number(this.discountForm.value || 0));
+          this.discount = { type: this.discountForm.type, value: cleanValue };
+          this.discountForm = { ...this.discount };
+          await db.settings.put({ key: "discount", value: this.discount });
+          alert("Discount saved.");
+        },
 
-                    const receiptWindow = window.open('', '_blank', 'width=400,height=600');
-                    const now = new Date(receiptData.timestamp || undefined);
-                    let receiptHTML = `
-                        <html>
-                        <head>
-                            <title>Receipt</title>
-                            <style>
-                                body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 10px; }
-                                .center { text-align: center; } .right { text-align: right; } .bold { font-weight: bold; }
-                                .receipt-item { margin: 5px 0; } .line { border-top: 1px dashed #000; margin: 10px 0; }
-                            </style>
-                        </head>
-                        <body>
-                            <div class="center bold">
-                                <h2>POS RECEIPT</h2>
-                                <p>${now.toLocaleDateString()} ${now.toLocaleTimeString()}</p>
-                            </div>
-                            <div class="line"></div>`;
-                    
-                    receiptData.items.forEach(item => {
-                        const subtotal = item.price * item.quantity;
-                        receiptHTML += `
-                            <div class="receipt-item">
-                                <span>${item.name}</span>
-                                <span class="right">₱${item.price.toFixed(2)} x ${item.quantity}</span><br>
-                                <span class="right bold">₱${subtotal.toFixed(2)}</span>
-                            </div>`;
-                    });
-                    
-                    receiptHTML += `
-                            <div class="line"></div>
-                            <div class="receipt-item bold"><span>TOTAL:</span><span class="right">₱${receiptData.total.toFixed(2)}</span></div>
-                            <div class="receipt-item"><span>CASH:</span><span class="right">₱${receiptData.paid.toFixed(2)}</span></div>
-                            <div class="receipt-item"><span>CHANGE:</span><span class="right">₱${receiptData.change.toFixed(2)}</span></div>
-                            <div class="line"></div>
-                            <div class="center"><p>Thank you!</p></div>
-                        </body>
-                        </html>`;
-                    
-                    receiptWindow.document.write(receiptHTML);
-                    receiptWindow.document.close();
-                    setTimeout(() => {
-                        receiptWindow.print();
-                        receiptWindow.close();
-                    }, 500);
-                }
-            }
+        async loadCategories() {
+          this.categories = await db.categories.orderBy("name").toArray();
+        },
+
+        async loadProducts() {
+          this.products = await db.products.reverse().toArray();
+        },
+
+        async loadSales() {
+          let sales;
+          if (this.currentUser && this.currentUser.role === "admin") {
+            sales = await db.sales.orderBy("timestamp").reverse().toArray();
+            const users = await db.users.toArray();
+            const namesById = users.reduce((map, user) => {
+              map[user.id] = user.name;
+              return map;
+            }, {});
+            sales = sales.map((sale) => ({
+              ...sale,
+              customerName: sale.customerName || namesById[sale.userId] || "Guest"
+            }));
+          } else if (this.currentUser) {
+            sales = await db.sales.where("userId").equals(this.currentUser.id).toArray();
+            sales.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            sales = sales.map((sale) => ({
+              ...sale,
+              customerName: sale.customerName || this.currentUser.name
+            }));
+          } else {
+            sales = [];
+          }
+          this.sales = sales.map((sale) => this.normalizeSale(sale));
+          this.allSales = this.sales;
+        },
+
+        normalizeSale(sale) {
+          return {
+            ...sale,
+            customerName: sale.customerName || sale.customerEmail || "Guest",
+            paymentStatus: sale.paymentStatus || sale.status || "Paid",
+            orderStatus: sale.orderStatus || "Preparing",
+            discountAmount: Number(sale.discountAmount || 0),
+            subtotal: Number(sale.subtotal || sale.total || 0)
+          };
+        },
+
+        async updateSale(sale) {
+          await db.sales.update(sale.id, {
+            paymentStatus: sale.paymentStatus,
+            orderStatus: sale.orderStatus
+          });
+          await this.loadSales();
+        },
+
+        handleImageUpload(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.formData.image = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        },
+
+        async addNewCategory() {
+          const name = prompt("Enter the name of the new category:");
+          if (!name || !name.trim()) return;
+          const trimmed = name.trim();
+          await db.categories.add({ name: trimmed });
+          await this.loadCategories();
+          this.formData.category = trimmed;
+        },
+
+        async deleteCategory(id) {
+          const category = this.categories.find((item) => item.id === id);
+          if (!category) return;
+          if (!confirm("Delete category '" + category.name + "'?")) return;
+          await db.categories.delete(id);
+          if (this.formData.category === category.name) this.formData.category = "";
+          await this.loadCategories();
+        },
+
+        async saveProduct() {
+          const payload = {
+            name: this.formData.name,
+            category: this.formData.category,
+            price: Number(this.formData.price || 0),
+            image: this.formData.image
+          };
+
+          if (this.isEditing) {
+            await db.products.update(this.formData.id, payload);
+          } else {
+            await db.products.add(payload);
+          }
+
+          this.resetForm();
+          await this.loadProducts();
+        },
+
+        editProduct(product) {
+          this.formData = { ...product };
+          this.isEditing = true;
+        },
+
+        async deleteProduct(id) {
+          if (!confirm("Are you sure you want to delete this item?")) return;
+          await db.products.delete(id);
+          await this.loadProducts();
+        },
+
+        resetForm() {
+          this.formData = { id: null, name: "", category: "", price: "", image: null };
+          this.isEditing = false;
+          const input = document.querySelector('input[type="file"]');
+          if (input) input.value = "";
+        },
+
+        get filteredProducts() {
+          if (this.activeCategory === "All") return this.products;
+          return this.products.filter((product) => product.category === this.activeCategory);
+        },
+
+        get cartSubtotal() {
+          return this.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        },
+
+        get discountAmount() {
+          const raw = this.discount.type === "percent"
+            ? this.cartSubtotal * (Number(this.discount.value || 0) / 100)
+            : Number(this.discount.value || 0);
+          return Math.min(this.cartSubtotal, Math.max(0, raw));
+        },
+
+        get cartTotal() {
+          return Math.max(0, this.cartSubtotal - this.discountAmount);
+        },
+
+        get change() {
+          return Math.max(0, Number(this.customerMoney || 0) - this.cartTotal);
+        },
+
+        userCartKey() {
+          return this.currentUser ? "posCart:" + this.currentUser.id : "";
+        },
+
+        async loadUserCart() {
+          const key = this.userCartKey();
+          if (!key) {
+            this.cart = [];
+            return;
+          }
+
+          try {
+            this.cart = JSON.parse(localStorage.getItem(key) || "[]");
+          } catch (error) {
+            this.cart = [];
+          }
+        },
+
+        async saveUserCart() {
+          const key = this.userCartKey();
+          if (!key) return;
+          localStorage.setItem(key, JSON.stringify(this.cart));
+        },
+
+        addToCart(product) {
+          const existing = this.cart.find((item) => item.id === product.id);
+          if (existing) {
+            existing.quantity += 1;
+          } else {
+            this.cart.push({
+              id: product.id,
+              name: product.name,
+              price: product.price,
+              quantity: 1
+            });
+          }
+          this.saveUserCart();
+        },
+
+        increaseQty(id) {
+          const item = this.cart.find((cartItem) => cartItem.id === id);
+          if (item) item.quantity += 1;
+          this.saveUserCart();
+        },
+
+        decreaseQty(id) {
+          const item = this.cart.find((cartItem) => cartItem.id === id);
+          if (!item) return;
+          item.quantity -= 1;
+          if (item.quantity <= 0) {
+            this.cart = this.cart.filter((cartItem) => cartItem.id !== id);
+          }
+          this.saveUserCart();
+        },
+
+        clearCart() {
+          if (!this.cart.length) return;
+          if (!confirm("Clear current order?")) return;
+          this.cart = [];
+          this.customerMoney = 0;
+          this.saveUserCart();
+        },
+
+        async checkout() {
+          if (!this.currentUser) {
+            this.currentView = "auth";
+            return;
+          }
+          if (this.cart.length === 0) return;
+          if (Number(this.customerMoney || 0) < this.cartTotal) {
+            alert("Insufficient payment amount.");
+            return;
+          }
+
+          const saleRecord = {
+            userId: this.currentUser.id,
+            customerName: this.currentUser.name,
+            customerEmail: this.currentUser.email,
+            items: this.cart.map((item) => ({ ...item })),
+            subtotal: this.cartSubtotal,
+            discountAmount: this.discountAmount,
+            total: this.cartTotal,
+            paid: Number(this.customerMoney || 0),
+            change: this.change,
+            paymentStatus: "Paid",
+            orderStatus: "Preparing",
+            timestamp: new Date().toISOString()
+          };
+
+          const id = await db.sales.add(saleRecord);
+          this.lastReceipt = { ...saleRecord, id };
+          this.cart = [];
+          this.customerMoney = 0;
+          await this.saveUserCart();
+          this.ticketNumber = this.generateTicket();
+          await this.loadSales();
+          alert("Order charged successfully.");
+        },
+
+        async showOrderHistory() {
+          if (!this.currentUser) {
+            this.currentView = "auth";
+            return;
+          }
+          await this.loadSales();
+          this.currentView = "history";
+        },
+
+        backToPos() {
+          this.currentView = "pos";
+        },
+
+        showSaleDetails(sale) {
+          this.selectedSale = this.normalizeSale(sale);
+        },
+
+        closeSaleDetails() {
+          this.selectedSale = null;
+        },
+
+        printReceipt(transaction) {
+          const receipt = transaction || this.lastReceipt;
+          if (!receipt || !receipt.items || receipt.items.length === 0) {
+            alert("No receipt available to print.");
+            return;
+          }
+
+          const receiptWindow = window.open("", "_blank", "width=400,height=620");
+          const date = new Date(receipt.timestamp || Date.now()).toLocaleString();
+          const customer = receipt.customerName ? "<p>Customer: " + receipt.customerName + "</p>" : "";
+          const items = receipt.items.map((item) => {
+            return "<div class='row'><span>" + item.name + " x " + item.quantity + "</span><span>" + this.formatMoney(item.price * item.quantity) + "</span></div>";
+          }).join("");
+
+          receiptWindow.document.write(
+            "<html><head><title>Receipt</title><style>" +
+            "body{font-family:'Courier New',monospace;font-size:12px;padding:12px}.center{text-align:center}.row{display:flex;justify-content:space-between;margin:6px 0}.line{border-top:1px dashed #000;margin:10px 0}.bold{font-weight:bold}" +
+            "</style></head><body>" +
+            "<div class='center'><h2>POS RECEIPT</h2><p>" + date + "</p>" + customer + "</div><div class='line'></div>" +
+            items +
+            "<div class='line'></div>" +
+            "<div class='row'><span>Subtotal</span><span>" + this.formatMoney(receipt.subtotal || receipt.total) + "</span></div>" +
+            "<div class='row'><span>Discount</span><span>-" + this.formatMoney(receipt.discountAmount || 0) + "</span></div>" +
+            "<div class='row bold'><span>Total</span><span>" + this.formatMoney(receipt.total) + "</span></div>" +
+            "<div class='row'><span>Paid</span><span>" + this.formatMoney(receipt.paid || 0) + "</span></div>" +
+            "<div class='row'><span>Change</span><span>" + this.formatMoney(receipt.change || 0) + "</span></div>" +
+            "<div class='line'></div><div class='center'>Thank you!</div>" +
+            "</body></html>"
+          );
+          receiptWindow.document.close();
+          setTimeout(() => {
+            receiptWindow.print();
+            receiptWindow.close();
+          }, 300);
+        },
+
+        formatMoney(value) {
+          return "PHP " + Number(value || 0).toFixed(2);
+        },
+
+        formatDate(value) {
+          return new Date(value).toLocaleString();
+        },
+
+        badgeClass(status) {
+          if (status === "Paid" || status === "Served") return "bg-green-100 text-green-800";
+          return "bg-yellow-100 text-yellow-800";
+        },
+
+        generateTicket() {
+          return Math.floor(Math.random() * 10000).toString().padStart(4, "0");
         }
-    </script>
+      };
+    }
+  </script>
 </body>
 </html>
