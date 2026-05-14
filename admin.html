@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud POS - Admin Dashboard</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAwloWQC4wzR5z3BIWPqQxoyR-2835jKoQ",
+      authDomain: "pos-web-system-6ab41.firebaseapp.com",
+      projectId: "pos-web-system-6ab41",
+      storageBucket: "pos-web-system-6ab41.firebasestorage.app",
+      messagingSenderId: "1074382185012",
+      appId: "1:1074382185012:web:c13960df381bb9d52fe061",
+      measurementId: "G-PYZMJ2NP6Z"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+    // Enable offline persistence for faster reads and offline support
+    db.enablePersistence().catch(err => {
+      if (err.code === 'failed-precondition') console.warn('Multiple tabs open, persistence limited to one tab.');
+      else if (err.code === 'unimplemented') console.warn('Persistence not available in this browser.');
+    });
+    const authReady = auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(error => {
+      console.error('Unable to set Firebase auth persistence:', error);
+    });
+  </script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background: #f5f7fb;
+      color: #111827;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Shell Architecture */
+    .app-workspace {
+      display: flex;
+      width: 100%;
+    }
+
+    .app-workspace.auth-hidden {
+      display: none;
+    }
+
+    .auth-loading {
+      position: fixed;
+      inset: 0;
+      background: #f5f7fb;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      color: #111827;
+    }
+
+    .auth-loading.hidden {
+      display: none;
+    }
+
+    .auth-loading-card {
+      width: min(360px, calc(100vw - 32px));
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    }
+
+    .auth-spinner {
+      width: 34px;
+      height: 34px;
+      border: 3px solid #dbeafe;
+      border-top-color: #355cff;
+      border-radius: 50%;
+      margin: 0 auto 16px;
+      animation: authSpin 0.8s linear infinite;
+    }
+
+    @keyframes authSpin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .sidebar {
+      width: 240px;
+      background: #fff;
+      border-right: 1px solid #e5e7eb;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      font-size: 18px;
+      font-weight: 700;
+      color: #355cff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 10px 30px 10px;
+    }
+
+    .nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      color: #6b7280;
+      text-decoration: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .nav-item:hover,
+    .nav-item.active {
+      background: #eef2ff;
+      color: #355cff;
+    }
+
+    .nav-item.logout {
+      color: #ef4444;
+    }
+
+    .main-canvas {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .topbar {
+      background: #f5f7fb;
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #fff;
+      padding: 6px 14px 6px 6px;
+      border-radius: 30px;
+      border: 1px solid #e5e7eb;
+      cursor: pointer;
+    }
+
+    .user-pill img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .workspace-content {
+      padding: 32px;
+      flex: 1;
+    }
+
+    .module-panel {
+      display: none;
+      width: 100%;
+    }
+
+    .module-panel.active {
+      display: block;
+    }
+
+    .card-box {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      padding: 24px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th {
+      padding-bottom: 14px;
+      color: #6b7280;
+      font-weight: 500;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    td {
+      padding: 14px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #d1fae5;
+      color: #10b981;
+    }
+
+    .input-style {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      outline: none;
+      font-size: 14px;
+    }
+
+    .input-style:focus {
+      border-color: #355cff;
+    }
+
+    .btn-primary {
+      background: #355cff;
+      color: #fff;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .stat-widget {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .stat-widget h3 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .stat-widget p {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+
+    .live-tag {
+      background: #dcfce7;
+      color: #166534;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .chart-box {
+      background: #fff;
+      padding: 24px;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      height: 260px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .line-canvas {
+      width: 100%;
+      height: 140px;
+      margin-top: 16px;
+      overflow: visible;
+    }
+
+    .line-canvas polyline {
+      fill: none;
+      stroke: #355cff;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .line-canvas circle {
+      fill: #355cff;
+      stroke: #fff;
+      stroke-width: 2;
+    }
+
+    .donut-layout {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      height: 100%;
+    }
+
+    .donut-ring {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      background: conic-gradient(#355cff 0% 35%, #f59e0b 35% 55%, #10b981 55% 73%, #ef4444 73% 88%, #9ca3af 88% 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .donut-hole {
+      width: 75px;
+      height: 75px;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    .legend-list {
+      list-style: none;
+      font-size: 12px;
+    }
+
+    .legend-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      color: #6b7280;
+    }
+
+    .legend-list span {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .toast-box {
+      position: fixed;
+      bottom: -100px;
+      right: 24px;
+      background: #ffffff;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      width: 300px;
+      z-index: 9999;
+      transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .toast-box.show {
+      bottom: 24px;
+    }
+
+    #print-receipt-container {
+      display: none;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+
+      #print-receipt-container,
+      #print-receipt-container * {
+        visibility: visible;
+      }
+
+      #print-receipt-container {
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 300px;
+        margin: 0;
+        padding: 0;
+      }
+
+      #mod-reports * {
+        visibility: visible;
+      }
+
+      #mod-reports {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+
+
+<body>
+
+  <div id="admin-app" class="app-workspace auth-hidden">
+    <aside class="sidebar">
+      <div>
+        <div class="brand"><i class="fa-solid fa-cloud"></i><span>Cloud POS</span></div>
+        <nav class="nav-list">
+          <a class="nav-item active" onclick="switchMod('dashboard')"><i class="fa-solid fa-house"></i> Dashboard</a>
+          <a class="nav-item" onclick="switchMod('products')"><i class="fa-solid fa-box"></i> Products</a>
+
+          <a class="nav-item" onclick="switchMod('history')"><i class="fa-solid fa-box-archive"></i> Archive</a>
+        </nav>
+      </div>
+      <div class="nav-list">
+        <a class="nav-item logout" onclick="triggerExit()"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+      </div>
+    </aside>
+
+    <div class="main-canvas">
+      <header class="topbar">
+        <div>
+          <h1 id="mod-title" style="font-size:20px; font-weight:600;">Operations Dashboard</h1>
+          <p id="mod-sub" style="font-size:12px; color:#6b7280;">Live enterprise aggregate operations telemetry</p>
+        </div>
+        <div class="user-pill"><img
+            src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&fit=crop&q=80" alt="Admin" /><span
+            style="font-size:13px; font-weight:500;">ADMIN</span></div>
+      </header>
+
+      <main class="workspace-content">
+        <div id="mod-dashboard" class="module-panel active">
+          <div class="stats-row">
+            <div class="stat-widget">
+              <h3 id="stat-count">0</h3>
+              <p>Today's Orders</p><span class="live-tag"><i class="fa-solid fa-circle-dot" style="font-size:8px;"></i>
+                Real-time</span>
+            </div>
+            <div class="stat-widget">
+              <h3 id="stat-vol">₱0.00</h3>
+              <p>Total Sales Today</p><span class="live-tag"><i class="fa-solid fa-circle-dot"
+                  style="font-size:8px;"></i> Real-time</span>
+            </div>
+            <div class="stat-widget">
+              <h3 id="stat-prod">5</h3>
+              <p>Active Inventory Entities</p><span style="font-size:11px; color:#6b7280;">Total items</span>
+            </div>
+            <div class="stat-widget">
+              <h3>18</h3>
+              <p>Registered Operator Users</p><span style="font-size:11px; color:#6b7280;">Total users</span>
+            </div>
+          </div>
+          <div
+            style="background:#fff; border-radius:16px; padding:32px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid #e2e8f0;">
+            <div style="margin-bottom:24px;">
+              <h2 style="font-size:20px; font-weight:700; color:#0f172a; margin-bottom:4px;">Today's Order History</h2>
+              <p style="font-size:13px; color:#64748b;" id="active-orders-date-label">Active orders for today</p>
+            </div>
+            <div style="background:#f8fafc; border-radius:12px; padding:4px; overflow-x:auto;">
+              <table style="width:100%; min-width:800px;">
+                <thead>
+                  <tr>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                      #</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                      Date</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                      Customer</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                      Items</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                      Total</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                      Payment</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                      Status</th>
+                    <th
+                      style="padding:12px 16px; text-align:center; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                      Details</th>
+                  </tr>
+                </thead>
+                <tbody id="live-table-mount" style="background:#fff;"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="mod-history" class="module-panel">
+          <div style="margin-bottom:32px;">
+            <h2 style="font-size:24px; font-weight:700; color:#0f172a; margin-bottom:8px;">Archive</h2>
+            <p style="font-size:14px; color:#64748b;">View and export orders grouped by date.</p>
+          </div>
+          <div class="card-box">
+            <table style="width:100%;">
+              <thead>
+                <tr>
+                  <th
+                    style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Date</th>
+                  <th
+                    style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Total Orders</th>
+                  <th
+                    style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Total Sales</th>
+                  <th
+                    style="padding:12px 16px; text-align:right; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Actions</th>
+                </tr>
+              </thead>
+              <tbody id="archive-group-mount" style="background:#fff;"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="archive-date-modal"
+          style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9999; align-items:center; justify-content:center;">
+          <div
+            style="background:#fff; border-radius:16px; padding:32px; width:800px; max-width:90vw; max-height:90vh; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+              <h3 style="font-size:20px; font-weight:700; color:#0f172a;">Orders for <span
+                  id="modal-archive-date"></span></h3>
+              <i class="fa-solid fa-xmark" style="cursor:pointer; color:#64748b; font-size:20px;"
+                onclick="document.getElementById('archive-date-modal').style.display='none'"></i>
+            </div>
+            <div style="overflow-y:auto; flex:1;">
+              <table style="width:100%;">
+                <thead>
+                  <tr>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase;">
+                      Order ID</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase;">
+                      Customer</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase;">
+                      Items</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase;">
+                      Total</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase;">
+                      Status</th>
+                    <th
+                      style="padding:12px 16px; text-align:left; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase;">
+                      Time</th>
+                  </tr>
+                </thead>
+                <tbody id="modal-archive-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="mod-products" class="module-panel">
+          <div style="display:grid; grid-template-columns: 320px 1fr; gap:24px; margin-bottom:24px;">
+            <div class="card-box">
+              <h3 style="font-size:18px; margin-bottom:24px; color:#0f172a; font-weight:700;">Add New Product</h3>
+              <div style="display:flex; flex-direction:column; gap:16px;">
+                <div>
+                  <label
+                    style="font-size:13px; display:block; margin-bottom:8px; font-weight:600; color:#334155;">Product
+                    Image</label>
+                  <input type="file" id="new-prod-image" accept="image/*" onchange="uploadProductImage(event)"
+                    style="font-size:12px; color:#64748b;" />
+                  <div id="new-prod-image-preview" style="display:none; margin-top:8px;">
+                    <img id="new-prod-img-tag" src=""
+                      style="width:100px; height:100px; object-fit:cover; border-radius:8px;" />
+                    <div id="new-prod-upload-progress"
+                      style="display:none; margin-top:8px; width:100%; height:6px; background:#e2e8f0; border-radius:999px; overflow:hidden;">
+                      <div id="new-prod-upload-bar"
+                        style="width:0%; height:100%; background:#2563eb; transition:width 0.2s ease;"></div>
+                    </div>
+                    <div id="new-prod-upload-status" style="display:none; margin-top:6px; font-size:11px; color:#64748b;">
+                      Uploading... 0%
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label
+                    style="font-size:13px; display:block; margin-bottom:8px; font-weight:600; color:#334155;">Product
+                    Name</label>
+                  <input type="text" class="input-style" placeholder="Item Name" id="new-prod-name"
+                    oninput="updateDraftProductPreview()" />
+                </div>
+                <div>
+                  <label
+                    style="font-size:13px; display:block; margin-bottom:8px; font-weight:600; color:#334155;">Category</label>
+                  <div style="display:flex; gap:8px;">
+                    <select class="input-style" id="new-prod-cat" style="flex:1; color:#475569;"
+                      onchange="updateDraftProductPreview()">
+                      <option>Select a category</option>
+                    </select>
+                    <button
+                      style="border:1px solid #e5e7eb; background:#fff; border-radius:10px; width:44px; display:flex; align-items:center; justify-content:center; cursor:pointer;"
+                      onclick="promptAddCategory()"><i class="fa-solid fa-plus" style="color:#0f172a;"></i></button>
+                  </div>
+                </div>
+                <div>
+                  <label
+                    style="font-size:13px; display:block; margin-bottom:8px; font-weight:600; color:#334155;">Price</label>
+                  <input type="number" class="input-style" placeholder="0.00" id="new-prod-price"
+                    oninput="updateDraftProductPreview()" />
+                </div>
+                <button id="save-new-product-btn"
+                  style="background:#0f172a; color:#fff; padding:14px; border-radius:10px; border:none; font-weight:600; font-size:14px; cursor:pointer; margin-top:8px;"
+                  onclick="saveNewProduct()">Save Item</button>
+              </div>
+            </div>
+
+            <div class="card-box">
+              <h3 style="font-size:18px; margin-bottom:24px; color:#0f172a; font-weight:700;">Current Menu</h3>
+              <div style="background:#f8fafc; border-radius:12px; padding:4px;">
+                <table style="width:100%;">
+                  <thead>
+                    <tr>
+                      <th
+                        style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                        Image</th>
+                      <th
+                        style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                        Name</th>
+                      <th
+                        style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                        Category</th>
+                      <th
+                        style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                        Price</th>
+                      <th
+                        style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; text-align:right;">
+                        Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="db-mount" style="background:#fff;"></tbody>
+                </table>
+              </div>
+              <div id="db-empty"
+                style="display:none; text-align:center; padding:60px 0; color:#64748b; font-size:14px; font-weight:500;">
+                No
+                products found. Add some items.</div>
+            </div>
+          </div>
+
+          <div class="card-box" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3 style="font-size:18px; margin-bottom:4px; color:#0f172a; font-weight:700;">Discount</h3>
+              <p style="font-size:13px; color:#64748b;">Applied to new register orders.</p>
+            </div>
+            <div style="display:flex; align-items:center; gap:16px;">
+              <select id="discount-type" class="input-style" style="width:140px; color:#334155;">
+                <option value="percent">Percent</option>
+                <option value="fixed">Fixed</option>
+              </select>
+              <input type="number" id="discount-value" class="input-style" style="width:100px; color:#334155;"
+                value="0" />
+              <button onclick="saveDiscount()"
+                style="background:#0f172a; color:#fff; padding:12px 32px; border-radius:10px; border:none; font-weight:600; font-size:14px; cursor:pointer;">Save</button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    function normalizeRole(role) {
+      return String(role || 'customer').trim().toLowerCase();
+    }
+
+    function readableAuthError(error) {
+      if (error.code === 'permission-denied') return 'Your account is signed in, but Firestore denied access to your user profile.';
+      if (error.code === 'auth/network-request-failed') return 'Network error. Check your connection and try again.';
+      if (error.code === 'auth/user-token-expired') return 'Your saved login expired. Please log in again.';
+      if (error.code === 'auth/user-disabled') return 'This account has been disabled.';
+      return 'Authentication failed. Please log in again.';
+    }
+
+    async function getUserProfile(user) {
+      const doc = await db.collection('users').doc(user.uid).get();
+      return doc.exists ? { id: doc.id, data: doc.data() } : null;
+    }
+
+    let currentUser = null;
+    let catalog = [];
+    let allOrders = [];
+    let allUsers = [];
+    let unsubscribeProfile = null;
+    let adminStarted = false;
+
+    function showAdminApp() {
+      const app = document.getElementById('admin-app');
+      if (app) app.classList.remove('auth-hidden');
+    }
+
+    function redirectToLogin() {
+      window.location.replace('login.html');
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        redirectToLogin();
+      } else {
+        try {
+          await authReady;
+          if (unsubscribeProfile) unsubscribeProfile();
+          unsubscribeProfile = db.collection('users').doc(user.uid).onSnapshot(snapshot => {
+            if (!snapshot.exists) {
+              alert("Your admin login works, but Firestore is missing users/" + user.uid + ". Create that document with role: \"admin\".");
+              auth.signOut().then(redirectToLogin);
+              return;
+            }
+
+            currentUser = snapshot.data();
+            currentUser.uid = user.uid;
+            currentUser.role = normalizeRole(currentUser.role);
+
+            if (currentUser.role !== 'admin') {
+              alert("Access Denied: Requires administrative authorization.");
+              auth.signOut().then(redirectToLogin);
+              return;
+            }
+
+            showAdminApp();
+
+            if (!adminStarted) {
+              adminStarted = true;
+              setupRealtimeListeners();
+              pullEntities();
+            }
+          }, error => {
+            alert(readableAuthError(error));
+            auth.signOut().then(redirectToLogin);
+          });
+        } catch (error) {
+          alert(readableAuthError(error));
+          auth.signOut().then(redirectToLogin);
+        }
+      }
+    });
+
+    let prodCategories = [];
+    let newProductImageUrl = '';
+    let newProductUploading = false;
+    let newProductSaving = false;
+    let newProductUploadToken = 0;
+    let newProductActiveUploadTask = null;
+    let newProductUploadError = null;
+    let newProductSelectedFile = null;
+    let newProductPreviewUrl = '';
+    let draftProductPreview = null;
+    let pendingProductPreviews = {};
+    let editProductUploading = false;
+    let editProductUploadToken = 0;
+    let currentEditDocId = null;
+    const PRODUCT_IMAGE_MAX_SIDE = 800;
+    const PRODUCT_IMAGE_MAX_BYTES = 500 * 1024;
+    const PRODUCT_IMAGE_TARGET_BYTES = 420 * 1024;
+    const PRODUCT_IMAGE_QUALITY = 0.74;
+    const PRODUCT_IMAGE_WEBP_QUALITY = 0.78;
+    const PRODUCT_PLACEHOLDER_IMAGE = 'https://via.placeholder.com/300x300?text=Uploading';
+
+    function normalizeProduct(doc) {
+      const data = doc.data ? doc.data() : doc;
+      const docId = doc.id || data.docId;
+      const pendingPreview = pendingProductPreviews[docId];
+      const imageURL = pendingPreview || data.imageURL || data.img || PRODUCT_PLACEHOLDER_IMAGE;
+      return {
+        ...data,
+        docId,
+        name: data.productName || data.name || '',
+        img: imageURL,
+        imageURL,
+        productName: data.productName || data.name || '',
+        price: Number(data.price) || 0
+      };
+    }
+
+    function createProductImageRef(file, extension) {
+      const ext = (extension || file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const safeBase = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-z0-9_-]/gi, '-').slice(0, 40) || 'product';
+      const uniqueId = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+      return storage.ref(`products/${uniqueId}_${safeBase}.${ext}`);
+    }
+
+    function updateNewProductUploadProgress(percent, message) {
+      const progress = document.getElementById('new-prod-upload-progress');
+      const bar = document.getElementById('new-prod-upload-bar');
+      const status = document.getElementById('new-prod-upload-status');
+      const shouldShow = percent !== null;
+      if (progress) progress.style.display = shouldShow ? 'block' : 'none';
+      if (status) status.style.display = shouldShow ? 'block' : 'none';
+      if (bar) bar.style.width = shouldShow ? `${Math.max(0, Math.min(100, percent || 0))}%` : '0%';
+      if (status) status.innerText = shouldShow ? (message || `Uploading... ${Math.round(percent || 0)}%`) : '';
+    }
+
+    function setNewProductSaveState() {
+      const btn = document.getElementById('save-new-product-btn');
+      if (!btn) return;
+      btn.disabled = newProductSaving;
+      btn.style.opacity = newProductSaving ? '0.65' : '1';
+      btn.style.cursor = newProductSaving ? 'wait' : 'pointer';
+      btn.innerText = newProductSaving ? 'Saving...' : 'Save Item';
+    }
+
+    function updateDraftProductPreview(options = {}) {
+      const name = document.getElementById('new-prod-name').value.trim();
+      const category = document.getElementById('new-prod-cat').value;
+      const price = parseFloat(document.getElementById('new-prod-price').value) || 0;
+
+      if (!newProductPreviewUrl && !name && !price && category === 'Select a category') {
+        draftProductPreview = null;
+      } else {
+        draftProductPreview = {
+          isDraft: true,
+          name: name || 'New product preview',
+          productName: name || 'New product preview',
+          category: category === 'Select a category' ? 'No category yet' : category,
+          price,
+          imageURL: options.imageURL || newProductImageUrl || newProductPreviewUrl || PRODUCT_PLACEHOLDER_IMAGE,
+          img: options.imageURL || newProductImageUrl || newProductPreviewUrl || PRODUCT_PLACEHOLDER_IMAGE,
+          uploadStatus: options.status || (newProductUploading ? 'Uploading...' : 'Preview')
+        };
+      }
+
+      if (document.getElementById('mod-products').classList.contains('active')) {
+        pullEntities();
+      }
+    }
+
+    function resetNewProductForm(options = {}) {
+      if (newProductPreviewUrl && !options.keepPreviewUrl) URL.revokeObjectURL(newProductPreviewUrl);
+      newProductImageUrl = '';
+      newProductSelectedFile = null;
+      newProductPreviewUrl = '';
+      newProductUploadError = null;
+      draftProductPreview = null;
+      document.getElementById('new-prod-name').value = '';
+      document.getElementById('new-prod-price').value = '';
+      document.getElementById('new-prod-cat').value = 'Select a category';
+      document.getElementById('new-prod-image').value = '';
+      document.getElementById('new-prod-image-preview').style.display = 'none';
+      updateNewProductUploadProgress(null, '');
+      pullEntities();
+    }
+
+    function loadImageForOptimization(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    function canvasToBlob(canvas, type, quality) {
+      return new Promise(resolve => {
+        canvas.toBlob(blob => resolve(blob), type, quality);
+      });
+    }
+
+    async function optimizeProductImage(file, previewUrl) {
+      if (!file.type || !file.type.startsWith('image/')) {
+        throw new Error('Please choose a valid image file.');
+      }
+
+      const img = await loadImageForOptimization(previewUrl);
+      const scale = Math.min(1, PRODUCT_IMAGE_MAX_SIDE / img.width, PRODUCT_IMAGE_MAX_SIDE / img.height);
+      const width = Math.max(1, Math.round(img.width * scale));
+      const height = Math.max(1, Math.round(img.height * scale));
+
+      if (scale === 1 && file.size <= PRODUCT_IMAGE_TARGET_BYTES && (file.type === 'image/webp' || file.type === 'image/jpeg')) {
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+        return { blob: file, contentType: file.type, extension: ext };
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      let webpBlob = await canvasToBlob(canvas, 'image/webp', PRODUCT_IMAGE_WEBP_QUALITY);
+      let jpgBlob = await canvasToBlob(canvas, 'image/jpeg', PRODUCT_IMAGE_QUALITY);
+      const candidates = [
+        webpBlob && webpBlob.type === 'image/webp' ? { blob: webpBlob, contentType: 'image/webp', extension: 'webp' } : null,
+        jpgBlob ? { blob: jpgBlob, contentType: 'image/jpeg', extension: 'jpg' } : null
+      ].filter(Boolean).sort((a, b) => a.blob.size - b.blob.size);
+      let optimized = candidates[0];
+      if (optimized && optimized.blob.size > PRODUCT_IMAGE_MAX_BYTES) {
+        const qualitySteps = [0.68, 0.6, 0.52, 0.44, 0.36];
+        for (const quality of qualitySteps) {
+          const compressedWebp = await canvasToBlob(canvas, 'image/webp', quality);
+          const compressedJpg = await canvasToBlob(canvas, 'image/jpeg', Math.max(0.42, quality - 0.04));
+          const smaller = [
+            compressedWebp && compressedWebp.type === 'image/webp' ? { blob: compressedWebp, contentType: 'image/webp', extension: 'webp' } : null,
+            compressedJpg ? { blob: compressedJpg, contentType: 'image/jpeg', extension: 'jpg' } : null
+          ].filter(Boolean).sort((a, b) => a.blob.size - b.blob.size)[0];
+          if (smaller && (!optimized || smaller.blob.size < optimized.blob.size)) optimized = smaller;
+          if (optimized && optimized.blob.size <= PRODUCT_IMAGE_MAX_BYTES) break;
+        }
+      }
+      const blob = optimized && optimized.blob;
+      if (!blob) throw new Error('Could not prepare the image for upload.');
+
+      return {
+        blob: (blob.size < file.size || file.size > PRODUCT_IMAGE_MAX_BYTES) ? blob : file,
+        contentType: (blob.size < file.size || file.size > PRODUCT_IMAGE_MAX_BYTES) ? optimized.contentType : file.type,
+        extension: (blob.size < file.size || file.size > PRODUCT_IMAGE_MAX_BYTES) ? optimized.extension : (file.name.split('.').pop() || 'jpg')
+      };
+    }
+
+    function uploadFileWithProgress(ref, blob, metadata, onProgress, onTask) {
+      return new Promise((resolve, reject) => {
+        const uploadTask = ref.put(blob, metadata);
+        if (onTask) onTask(uploadTask);
+        uploadTask.on(firebase.storage.TaskEvent.STATE_CHANGED, snapshot => {
+          const percent = snapshot.totalBytes ? (snapshot.bytesTransferred / snapshot.totalBytes) * 100 : 0;
+          if (onProgress) onProgress(percent);
+        }, reject, () => resolve(uploadTask.snapshot));
+      });
+    }
+
+    function setupRealtimeListeners() {
+      allUsers = [currentUser];
+
+      db.collection('orders').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+        allOrders = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          data.docId = doc.id;
+          data.id = data.id || data.ticketId || doc.id;
+          allOrders.push(data);
+        });
+        pullLiveStreams();
+        if (document.getElementById('mod-history').classList.contains('active')) {
+          pullHistory();
+        }
+      }, error => showToast(readableAuthError(error)));
+
+      db.collection('products').onSnapshot(snapshot => {
+        catalog = [];
+        snapshot.forEach(doc => {
+          catalog.push(normalizeProduct(doc));
+        });
+        if (document.getElementById('mod-products').classList.contains('active')) {
+          pullEntities();
+        }
+      }, error => showToast(readableAuthError(error)));
+
+      db.collection('settings').doc('categories').onSnapshot(doc => {
+        if (doc.exists) {
+          prodCategories = doc.data().list || [];
+        } else {
+          prodCategories = ['Meals', 'Beverages', 'Snacks', 'Desserts'];
+          db.collection('settings').doc('categories').set({ list: prodCategories });
+        }
+        updateCategoryDropdowns();
+      });
+
+      db.collection('settings').doc('discount').onSnapshot(doc => {
+        if (doc.exists) {
+          const d = doc.data();
+          const typeEl = document.getElementById('discount-type');
+          const valEl = document.getElementById('discount-value');
+          if (typeEl) typeEl.value = d.type || 'percent';
+          if (valEl) valEl.value = d.value || 0;
+        }
+      });
+    }
+
+    function updateCategoryDropdowns() {
+      const selects = [document.getElementById('new-prod-cat'), document.getElementById('edit-prod-cat')];
+      selects.forEach(sel => {
+        if (!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '<option>Select a category</option>';
+        prodCategories.forEach(c => {
+          sel.innerHTML += `<option value="${c}">${c}</option>`;
+        });
+        if (prodCategories.includes(currentVal)) sel.value = currentVal;
+      });
+    }
+
+    function promptAddCategory() {
+      const cat = prompt("Enter new category name:");
+      if (cat && cat.trim().length > 0) {
+        if (!prodCategories.includes(cat.trim())) {
+          prodCategories.push(cat.trim());
+          db.collection('settings').doc('categories').set({ list: prodCategories }).then(() => {
+            showToast("Category added!");
+          });
+        }
+      }
+    }
+
+    function uploadProductImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (newProductSaving || newProductUploading) {
+        alert("Please wait for the current product upload to finish.");
+        event.target.value = '';
+        return;
+      }
+      ++newProductUploadToken;
+      if (newProductActiveUploadTask) {
+        newProductActiveUploadTask.cancel();
+        newProductActiveUploadTask = null;
+      }
+      if (newProductPreviewUrl) URL.revokeObjectURL(newProductPreviewUrl);
+      newProductUploading = false;
+      newProductImageUrl = '';
+      newProductUploadError = null;
+      newProductSelectedFile = file;
+      setNewProductSaveState();
+      const previewUrl = URL.createObjectURL(file);
+      newProductPreviewUrl = previewUrl;
+      document.getElementById('new-prod-img-tag').src = previewUrl;
+      document.getElementById('new-prod-image-preview').style.display = 'block';
+      updateNewProductUploadProgress(null, '');
+      updateDraftProductPreview({ status: 'Preview' });
+    }
+
+    async function uploadSelectedProductImage() {
+      if (!newProductSelectedFile) return '';
+      const uploadToken = ++newProductUploadToken;
+      newProductUploading = true;
+      newProductUploadError = null;
+      setNewProductSaveState();
+      updateNewProductUploadProgress(2, 'Preparing image...');
+      updateDraftProductPreview({ status: 'Preparing image...' });
+
+      try {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        const optimized = await optimizeProductImage(newProductSelectedFile, newProductPreviewUrl);
+        if (uploadToken !== newProductUploadToken) return '';
+
+        const ref = createProductImageRef(newProductSelectedFile, optimized.extension);
+        updateNewProductUploadProgress(5, 'Uploading... 0%');
+        updateDraftProductPreview({ status: 'Uploading... 0%' });
+
+        const snapshot = await uploadFileWithProgress(ref, optimized.blob, {
+          contentType: optimized.contentType,
+          cacheControl: 'public,max-age=31536000'
+        }, percent => {
+          if (uploadToken === newProductUploadToken) {
+            const message = `Uploading... ${Math.round(percent)}%`;
+            updateNewProductUploadProgress(percent, message);
+            updateDraftProductPreview({ status: message });
+          }
+        }, uploadTask => {
+          if (uploadToken === newProductUploadToken) newProductActiveUploadTask = uploadTask;
+        });
+
+        if (uploadToken !== newProductUploadToken) return '';
+        const url = await snapshot.ref.getDownloadURL();
+        if (uploadToken !== newProductUploadToken) return '';
+
+        newProductImageUrl = url;
+        newProductUploadError = null;
+        document.getElementById('new-prod-img-tag').src = url;
+        updateNewProductUploadProgress(100, 'Upload complete.');
+        updateDraftProductPreview({ imageURL: url, status: 'Upload complete.' });
+        showToast("Image uploaded successfully.");
+        return url;
+      } catch (err) {
+        console.error(err);
+        if (uploadToken === newProductUploadToken && err.code !== 'storage/canceled') {
+          newProductUploadError = err;
+          updateNewProductUploadProgress(null, '');
+          updateDraftProductPreview({ status: 'Upload failed' });
+          showToast(err.message || "Error uploading image");
+        }
+        return '';
+      } finally {
+        if (uploadToken === newProductUploadToken) {
+          newProductActiveUploadTask = null;
+          newProductUploading = false;
+          setNewProductSaveState();
+        }
+      }
+    }
+
+    async function uploadProductImageForDoc(docRef, file, previewUrl, uploadToken) {
+      try {
+        const optimized = await optimizeProductImage(file, previewUrl);
+        const ref = createProductImageRef(file, optimized.extension);
+        let lastProgressWrite = 0;
+        let lastProgressValue = -1;
+        const snapshot = await uploadFileWithProgress(ref, optimized.blob, {
+          contentType: optimized.contentType,
+          cacheControl: 'public,max-age=31536000'
+        }, percent => {
+          const rounded = Math.round(percent);
+          const now = Date.now();
+          if (rounded < 100 && rounded - lastProgressValue < 15 && now - lastProgressWrite < 1200) return;
+          lastProgressWrite = now;
+          lastProgressValue = rounded;
+          const message = `Uploading image... ${rounded}%`;
+          docRef.update({
+            imageUploadStatus: message,
+            imageUploadProgress: rounded,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).catch(err => console.error('Could not update upload progress:', err));
+        });
+        const url = await snapshot.ref.getDownloadURL();
+        await docRef.update({
+          imageURL: url,
+          img: url,
+          imageUploadStatus: 'complete',
+          imageUploadProgress: 100,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        if (pendingProductPreviews[docRef.id] === previewUrl) {
+          delete pendingProductPreviews[docRef.id];
+          URL.revokeObjectURL(previewUrl);
+          pullEntities();
+        }
+        showToast("Product image uploaded.");
+        return url;
+      } catch (err) {
+        console.error(err);
+        await docRef.update({
+          imageUploadStatus: 'failed',
+          imageUploadError: err.message || 'Image upload failed',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(updateErr => console.error('Could not mark image upload failed:', updateErr));
+        if (pendingProductPreviews[docRef.id] === previewUrl) {
+          delete pendingProductPreviews[docRef.id];
+          URL.revokeObjectURL(previewUrl);
+          pullEntities();
+        }
+        showToast(err.message || "Image upload failed. Product was saved with a placeholder.");
+        return '';
+      }
+    }
+
+    function uploadProductEditImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const uploadToken = ++editProductUploadToken;
+      editProductUploading = true;
+      const previewUrl = URL.createObjectURL(file);
+      const preview = document.getElementById('edit-prod-img-preview');
+      if (preview) {
+        preview.src = previewUrl;
+        preview.parentElement.style.display = 'block';
+      }
+      showToast("Optimizing image...");
+      optimizeProductImage(file, previewUrl).then(optimized => {
+        if (uploadToken !== editProductUploadToken) return null;
+        const ref = createProductImageRef(file, optimized.extension);
+        showToast("Uploading optimized image...");
+        return ref.put(optimized.blob, {
+          contentType: optimized.contentType,
+          cacheControl: 'public,max-age=31536000'
+        });
+      }).then(snapshot => {
+        if (!snapshot || uploadToken !== editProductUploadToken) return '';
+        return snapshot.ref.getDownloadURL();
+      }).then(url => {
+        if (uploadToken !== editProductUploadToken) return;
+        if (!url) return;
+        document.getElementById('edit-prod-img').value = url;
+        if (preview) preview.src = url;
+        showToast("Image uploaded!");
+      }).catch(err => {
+        showToast("Error uploading image");
+        console.error(err);
+      }).finally(() => {
+        if (uploadToken === editProductUploadToken) {
+          editProductUploading = false;
+          URL.revokeObjectURL(previewUrl);
+        }
+      });
+    }
+
+    function saveDiscount() {
+      const type = document.getElementById('discount-type').value;
+      const value = parseFloat(document.getElementById('discount-value').value) || 0;
+      db.collection('settings').doc('discount').set({ type, value }).then(() => {
+        showToast('Discount saved successfully.');
+      });
+    }
+
+    function switchMod(mod) {
+      document.querySelectorAll('.module-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(`mod-${mod}`).classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+
+      const meta = { dashboard: { t: "Dashboard", s: "Welcome back, Admin!" }, history: { t: "Order Archive", s: "Browse past order records" }, products: { t: "Products / Menu", s: "Manage your products and inventory" } };
+      if (meta[mod]) { document.getElementById('mod-title').innerText = meta[mod].t; document.getElementById('mod-sub').innerText = meta[mod].s; }
+      if (mod === 'dashboard') pullLiveStreams();
+      if (mod === 'history') pullHistory();
+      if (mod === 'products') pullEntities();
+    }
+
+    function normalizeOrderStatus(order) {
+      return String(order.status || order.stat || 'preparing').trim().toLowerCase();
+    }
+
+    function statusLabel(status) {
+      return String(status || 'preparing').replace(/^\w/, c => c.toUpperCase());
+    }
+
+    function pullLiveStreams() {
+      const d = new Date();
+      const todayStr = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+      document.getElementById('active-orders-date-label').innerText = `Active orders for ${todayStr}`;
+
+      const todaysOrders = allOrders.filter(o => o.date === todayStr || o.date === d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+
+      document.getElementById('stat-count').innerText = todaysOrders.length;
+      document.getElementById('stat-vol').innerText = `₱${todaysOrders.reduce((a, c) => a + c.total, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      document.getElementById('stat-prod').innerText = catalog.length;
+
+      const tMount = document.getElementById('live-table-mount');
+      tMount.innerHTML = '';
+      todaysOrders.forEach(o => {
+        const status = normalizeOrderStatus(o);
+        const orderDocId = o.docId || o.id;
+        tMount.innerHTML += `<tr>
+          <td style="font-weight:700; color:#0f172a; padding:16px;">${o.id.replace('Ticket: #', '')}</td>
+          <td style="color:#64748b; font-size:13px; padding:16px;">${o.time} - ${o.date}</td>
+          <td style="font-weight:600; color:#334155; font-size:13px; padding:16px;">${o.cust || o.userId || 'Guest'}</td>
+          <td style="color:#64748b; font-size:13px; padding:16px;">${o.items} item(s)</td>
+          <td style="font-weight:700; color:#0f172a; font-size:13px; padding:16px;">₱${(o.totalPrice || o.total).toFixed(2)}</td>
+          <td style="padding:16px;">
+             <select onchange="updateOrderField('${orderDocId}', 'paymentStatus', this.value)" style="padding:6px 12px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px; color:#334155; outline:none; cursor:pointer;">
+                <option value="Paid" ${o.paymentStatus === 'Paid' || !o.paymentStatus ? 'selected' : ''}>Paid</option>
+                <option value="Unpaid" ${o.paymentStatus === 'Unpaid' ? 'selected' : ''}>Unpaid</option>
+             </select>
+          </td>
+          <td style="padding:16px;">
+             <select onchange="updateOrderField('${orderDocId}', 'status', this.value)" style="padding:6px 12px; border-radius:6px; border:1px solid #cbd5e1; font-size:13px; color:#334155; outline:none; cursor:pointer;">
+                <option value="preparing" ${status === 'preparing' ? 'selected' : ''}>Preparing</option>
+                <option value="served" ${status === 'served' || status === 'completed' ? 'selected' : ''}>Served</option>
+             </select>
+          </td>
+          <td style="padding:16px; text-align:center;">
+             <a style="color:#3b82f6; font-weight:600; cursor:pointer; font-size:13px;" onclick="viewOrderDetails('${orderDocId}')">View</a>
+          </td>
+        </tr>`;
+      });
+    }
+
+    function updateOrderField(id, field, value) {
+      const updates = { [field]: value };
+      if (field === 'status') updates.stat = statusLabel(value);
+      db.collection('orders').doc(id).update(updates).then(() => {
+        showToast("Order Updated Successfully");
+      }).catch(err => showToast("Error", err.message));
+    }
+
+    function viewOrderDetails(id) {
+      let order = allOrders.find(o => o.docId === id || o.id === id);
+      if (!order) return;
+
+      let itemsHtml = '';
+      if (order.cartItems && order.cartItems.length > 0) {
+        order.cartItems.forEach(item => {
+          itemsHtml += `
+             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span>${item.qty}x ${item.name}</span>
+                <span>₱${(item.price * item.qty).toFixed(2)}</span>
+             </div>
+           `;
+        });
+      } else {
+        itemsHtml += `<div>Legacy items: ${order.items}</div>`;
+      }
+
+      const receiptHtml = `
+           <div style="text-align:center; margin-bottom:16px;">
+              <h2 style="margin:0; font-size:24px;">CLOUD POS</h2>
+              <p style="margin:4px 0;">Receipt ${order.id}</p>
+              <p style="margin:0;">Date: ${order.date} ${order.time}</p>
+              <p style="margin:4px 0;">Customer: ${order.cust || 'Guest'}</p>
+           </div>
+           <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 12px 0; margin-bottom:12px;">
+              ${itemsHtml}
+           </div>
+           <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:18px; margin-bottom:12px;">
+              <span>TOTAL</span>
+              <span>₱${order.total.toFixed(2)}</span>
+           </div>
+           <div style="text-align:center;">
+              <p style="margin:4px 0;">Status: ${order.paymentStatus || order.pay}</p>
+              <p style="margin:16px 0 0 0; font-size:14px;">Thank you for your business!</p>
+           </div>
+      `;
+
+      document.getElementById('modal-receipt-content').innerHTML = receiptHtml;
+      document.getElementById('modal-print-btn').setAttribute('data-id', order.docId || order.id);
+      document.getElementById('order-details-modal').style.display = 'flex';
+    }
+
+    function pullHistory() {
+      const d = new Date();
+      const todayStr = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+      const todayStrShort = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      const archiveOrders = allOrders.filter(o => o.date !== todayStr && o.date !== todayStrShort);
+      const dates = [...new Set(archiveOrders.map(o => o.date))].sort((a, b) => new Date(b) - new Date(a));
+
+      const mount = document.getElementById('archive-group-mount');
+      let html = '';
+      dates.forEach(d => {
+        const dOrders = archiveOrders.filter(o => o.date === d);
+        const totalSales = dOrders.reduce((a, c) => a + (c.totalPrice || c.total || 0), 0);
+        html += `<tr>
+          <td style="padding:16px; font-weight:700; color:#0f172a; font-size:14px;">${d}</td>
+          <td style="padding:16px; color:#334155; font-size:13px; font-weight:600;">${dOrders.length}</td>
+          <td style="padding:16px; font-weight:700; color:#10b981; font-size:14px;">₱${totalSales.toFixed(2)}</td>
+          <td style="padding:16px; text-align:right;">
+             <button onclick="viewArchiveDate('${d}')" style="background:#f1f5f9; color:#3b82f6; border:none; padding:8px 16px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; margin-right:8px;">View</button>
+             <button onclick="exportArchive('${d}')" style="background:#fff; color:#475569; border:1px solid #cbd5e1; padding:8px 16px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer;"><i class="fa-solid fa-download"></i> Export</button>
+          </td>
+        </tr>`;
+      });
+      mount.innerHTML = html;
+    }
+
+    function viewArchiveDate(date) {
+      const dOrders = allOrders.filter(o => o.date === date);
+      document.getElementById('modal-archive-date').innerText = date;
+      const mount = document.getElementById('modal-archive-table');
+      let html = '';
+      dOrders.forEach(o => {
+        html += `<tr>
+            <td style="padding:16px; font-weight:700; color:#0f172a;">${o.id}</td>
+            <td style="padding:16px; color:#334155; font-size:13px;">${o.cust || o.userId || 'Guest'}</td>
+            <td style="padding:16px; color:#334155; font-size:13px;">${o.items}</td>
+            <td style="padding:16px; font-weight:700; color:#0f172a;">₱${(o.totalPrice || o.total).toFixed(2)}</td>
+            <td style="padding:16px;"><span style="background:#dcfce7; color:#166534; padding: 4px 10px; border-radius: 6px; font-size:11px; font-weight:600;">${o.status || o.stat || 'Completed'}</span></td>
+            <td style="padding:16px; color:#64748b; font-size:13px;">${o.time}</td>
+          </tr>`;
+      });
+      mount.innerHTML = html;
+      document.getElementById('archive-date-modal').style.display = 'flex';
+    }
+
+    function exportArchive(date) {
+      const dOrders = allOrders.filter(o => o.date === date);
+      if (dOrders.length === 0) return;
+      let csv = 'Order ID,Customer,Items,Total,Status,Time\n';
+      dOrders.forEach(o => {
+        const cust = (o.cust || o.userId || 'Guest').replace(/,/g, '');
+        const items = o.items;
+        const total = (o.totalPrice || o.total).toFixed(2);
+        const status = o.status || o.stat || 'Completed';
+        csv += `${o.id},${cust},${items},${total},${status},${o.time}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('hidden', '');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `orders_${date.replace(/, /g, '_').replace(/ /g, '_')}.csv`);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function pullEntities() {
+      const mount = document.getElementById('db-mount'); mount.innerHTML = '';
+      const rows = draftProductPreview ? [draftProductPreview, ...catalog] : catalog;
+      if (rows.length === 0) {
+        document.getElementById('db-empty').style.display = 'block';
+      } else {
+        document.getElementById('db-empty').style.display = 'none';
+        let html = '';
+        rows.forEach((ent, index) => {
+          const productIndex = draftProductPreview ? index - 1 : index;
+          const actionHtml = ent.isDraft
+            ? `<span style="display:inline-flex; align-items:center; gap:6px; color:#2563eb; font-weight:600; font-size:12px;"><i class="fa-solid fa-circle-notch fa-spin" style="${newProductUploading ? '' : 'display:none;'}"></i>${ent.uploadStatus || 'Preview'}</span>`
+            : `<a style="color:#2563eb; font-weight:600; cursor:pointer; font-size:13px; margin-right:16px;" onclick="editEntity(${productIndex})">Edit</a>
+               <a style="color:#ef4444; font-weight:600; cursor:pointer; font-size:13px;" onclick="deleteEntity('${ent.docId}')">Delete</a>`;
+          html += `<tr>
+            <td style="padding:16px;"><img src="${ent.imageURL || ent.img || 'https://via.placeholder.com/40'}" loading="lazy" decoding="async" style="width:40px; height:40px; object-fit:cover; border-radius: 8px; border: 1px solid #e2e8f0; padding:2px; background:#fff;" alt="img"/></td>
+            <td style="font-weight:700; padding:16px; color:#0f172a; font-size:14px;">${ent.name}</td>
+            <td style="padding:16px;"><span style="border: 1px solid #e2e8f0; border-radius: 20px; padding: 6px 12px; color: #475569; font-size: 12px; font-weight:500;">${ent.category}</span></td>
+            <td style="font-weight:700; padding:16px; color:#0f172a; font-size:14px;">₱${(ent.price || 0).toFixed(2)}</td>
+            <td style="text-align:right; padding:16px;">
+               ${actionHtml}
+            </td>
+          </tr>`;
+        });
+        mount.innerHTML = html;
+      }
+    }
+
+    async function saveNewProduct() {
+      if (newProductSaving || newProductUploading) return;
+      const name = document.getElementById('new-prod-name').value.trim();
+      const cat = document.getElementById('new-prod-cat').value;
+      const price = parseFloat(document.getElementById('new-prod-price').value);
+      if (!name || !price || cat === 'Select a category') { alert("Please fill all required fields."); return; }
+
+      newProductSaving = true;
+      setNewProductSaveState();
+      updateDraftProductPreview({ status: 'Saving...' });
+
+      const selectedFile = newProductSelectedFile;
+      const previewUrl = newProductPreviewUrl;
+      const docRef = db.collection('products').doc();
+      const newId = Date.now();
+      const imageURL = newProductImageUrl || (selectedFile ? PRODUCT_PLACEHOLDER_IMAGE : "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&fit=crop&q=80");
+
+      if (selectedFile && previewUrl) {
+        pendingProductPreviews[docRef.id] = previewUrl;
+      }
+
+      updateDraftProductPreview({ imageURL: selectedFile && previewUrl ? previewUrl : imageURL, status: selectedFile ? 'Saving, then uploading...' : 'Saving...' });
+      docRef.set({
+        id: newId,
+        clientRequestId: docRef.id,
+        productName: name,
+        name: name,
+        category: cat,
+        price: price,
+        imageURL: imageURL,
+        img: imageURL,
+        imageUploadStatus: selectedFile ? 'queued' : 'complete',
+        imageUploadProgress: selectedFile ? 0 : 100,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        stock: 50,
+        status: "Available"
+      }).then(() => {
+        showToast(selectedFile ? "Product added. Image is uploading in the background." : "Product added successfully");
+        resetNewProductForm({ keepPreviewUrl: !!selectedFile });
+        if (selectedFile && previewUrl) {
+          uploadProductImageForDoc(docRef, selectedFile, previewUrl);
+        }
+      }).catch(err => {
+        showToast("Error adding product");
+        console.error(err);
+        if (pendingProductPreviews[docRef.id] === previewUrl) {
+          delete pendingProductPreviews[docRef.id];
+          if (previewUrl) URL.revokeObjectURL(previewUrl);
+        }
+        updateDraftProductPreview({ imageURL, status: 'Save failed' });
+      }).finally(() => {
+        newProductSaving = false;
+        setNewProductSaveState();
+      });
+    }
+
+    function editEntity(index) {
+      const product = catalog[index];
+      currentEditDocId = product.docId;
+      document.getElementById('edit-prod-id').value = product.id;
+      document.getElementById('edit-prod-name').value = product.name;
+      document.getElementById('edit-prod-cat').value = product.category;
+      document.getElementById('edit-prod-price').value = product.price;
+      document.getElementById('edit-prod-img').value = product.imageURL || product.img || '';
+      const preview = document.getElementById('edit-prod-img-preview');
+      if (preview) {
+        preview.src = product.imageURL || product.img || '';
+        preview.parentElement.style.display = (product.imageURL || product.img) ? 'block' : 'none';
+      }
+      document.getElementById('edit-product-modal').style.display = 'flex';
+    }
+
+    function saveProductEdit() {
+      if (!currentEditDocId) return;
+      if (editProductUploading) { alert("Please wait for the image upload to finish before saving."); return; }
+      const productName = document.getElementById('edit-prod-name').value;
+      const imageURL = document.getElementById('edit-prod-img').value;
+      const updates = {
+        productName: productName,
+        name: productName,
+        category: document.getElementById('edit-prod-cat').value,
+        price: parseFloat(document.getElementById('edit-prod-price').value),
+        imageURL: imageURL,
+        img: imageURL
+      };
+
+      db.collection('products').doc(currentEditDocId).update(updates).then(() => {
+        document.getElementById('edit-product-modal').style.display = 'none';
+        showToast('Product updated successfully.');
+      }).catch(err => showToast('Error updating product'));
+    }
+
+    function showToast(message) {
+      document.getElementById('toast-txt').innerText = message;
+      const t = document.getElementById('app-toast');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    function deleteEntity(docId) {
+      if (confirm("Are you sure you want to delete this product?")) {
+        db.collection('products').doc(docId).delete().then(() => {
+          showToast('Product deleted');
+        }).catch(err => showToast('Error deleting product'));
+      }
+    }
+
+    function triggerReceiptPrint(orderId) {
+      const order = allOrders.find(o => o.docId === orderId || o.id === orderId);
+      if (!order) return;
+
+      let itemsHtml = '';
+      if (order.cartItems && order.cartItems.length > 0) {
+        order.cartItems.forEach(item => {
+          itemsHtml += `
+             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span>${item.qty}x ${item.name}</span>
+                <span>₱${(item.price * item.qty).toFixed(2)}</span>
+             </div>
+           `;
+        });
+      }
+
+      const receiptHtml = `
+        <div style="width: 300px; font-family: monospace; color: #000; background: #fff; padding: 20px;">
+           <div style="text-align:center; margin-bottom:16px;">
+              <h2 style="margin:0; font-size:24px;">CLOUD POS</h2>
+              <p style="margin:4px 0;">Receipt ${order.id}</p>
+              <p style="margin:0;">Date: ${order.date} ${order.time}</p>
+              <p style="margin:4px 0;">Customer: ${order.cust || 'Guest'}</p>
+           </div>
+           <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 12px 0; margin-bottom:12px;">
+              ${itemsHtml}
+           </div>
+           <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:18px; margin-bottom:12px;">
+              <span>TOTAL</span>
+              <span>₱${order.total.toFixed(2)}</span>
+           </div>
+           <div style="text-align:center;">
+              <p style="margin:4px 0;">Status: ${order.paymentStatus || order.pay}</p>
+              <p style="margin:16px 0 0 0; font-size:14px;">Thank you for your business!</p>
+           </div>
+        </div>
+      `;
+
+      let printDiv = document.getElementById('print-receipt-container');
+      if (!printDiv) {
+        printDiv = document.createElement('div');
+        printDiv.id = 'print-receipt-container';
+        document.body.appendChild(printDiv);
+      }
+      printDiv.innerHTML = receiptHtml;
+
+      document.getElementById('order-details-modal').style.display = 'none';
+      window.print();
+    }
+
+    function triggerExit() {
+      auth.signOut().then(() => {
+        window.location.href = 'login.html';
+      });
+    }
+
+  </script>
+  <div id="order-details-modal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center; backdrop-filter:blur(4px);">
+    <div style="background:#fff; width:340px; padding:20px; position:relative; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+      <button onclick="document.getElementById('order-details-modal').style.display='none'"
+        style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:20px; color:#64748b; cursor:pointer; z-index:10;"><i
+          class="fa-solid fa-xmark"></i></button>
+      <div id="modal-receipt-content" style="font-family: monospace; color:#000;">
+        <!-- Inject Receipt HTML here -->
+      </div>
+      <button id="modal-print-btn"
+        style="width:100%; padding:14px; background:#0b132b; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; margin-top: 16px; font-family: 'Poppins', sans-serif;"
+        onclick="triggerReceiptPrint(this.getAttribute('data-id'))"><i class="fa-solid fa-print"
+          style="margin-right:8px;"></i> Print Receipt</button>
+    </div>
+  </div>
+
+  <div id="edit-product-modal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center; backdrop-filter:blur(4px);">
+    <div
+      style="background:#fff; width:100%; max-width:400px; border-radius:16px; box-shadow:0 10px 25px rgba(0,0,0,0.1); padding:32px; position:relative;">
+      <button onclick="document.getElementById('edit-product-modal').style.display='none'"
+        style="position:absolute; top:24px; right:24px; background:none; border:none; font-size:20px; color:#64748b; cursor:pointer;"><i
+          class="fa-solid fa-xmark"></i></button>
+      <h2 style="font-size:20px; font-weight:700; color:#0f172a; margin-bottom:4px;">Edit Product</h2>
+      <p style="font-size:13px; color:#64748b; margin-bottom:24px;">Update inventory details.</p>
+
+      <input type="hidden" id="edit-prod-id" />
+      <div style="display:flex; flex-direction:column; gap:16px; margin-bottom:24px;">
+        <div>
+          <label style="font-size:12px; font-weight:600; display:block; margin-bottom:6px;">Product Name</label>
+          <input type="text" id="edit-prod-name" class="input-style" />
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div>
+            <label style="font-size:12px; font-weight:600; display:block; margin-bottom:6px;">Category</label>
+            <select id="edit-prod-cat" class="input-style">
+              <option>Meals</option>
+              <option>Drinks</option>
+              <option>Add-ons</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600; display:block; margin-bottom:6px;">Price (₱)</label>
+            <input type="number" id="edit-prod-price" class="input-style" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px; font-weight:600; display:block; margin-bottom:6px;">Image</label>
+          <input type="file" accept="image/*" onchange="uploadProductEditImage(event)"
+            style="font-size:12px; color:#64748b;" />
+          <input type="hidden" id="edit-prod-img" />
+          <div style="display:none; margin-top:8px;">
+            <img id="edit-prod-img-preview" src=""
+              style="width:100px; height:100px; object-fit:cover; border-radius:8px;" />
+          </div>
+        </div>
+      </div>
+
+      <button
+        style="width:100%; padding:14px; background:#3b82f6; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;"
+        onclick="saveProductEdit()">Save Changes</button>
+    </div>
+  </div>
+
+  <div class="toast-box" id="app-toast">
+    <div
+      style="background: #10b981; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <i class="fa-solid fa-check" style="font-size: 12px;"></i>
+    </div>
+    <div style="flex:1;">
+      <h4 style="font-size: 13px; color: #111827; margin: 0; font-weight: 600;">Success!</h4>
+      <p id="toast-txt" style="font-size: 11px; color: #6b7280; margin: 2px 0 0 0;">Action completed successfully.</p>
+    </div>
+    <i class="fa-solid fa-xmark" style="color: #9ca3af; cursor: pointer;"
+      onclick="document.getElementById('app-toast').classList.remove('show')"></i>
+  </div>
+
+
+</body>
+
+</html>
