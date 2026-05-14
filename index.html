@@ -1,1328 +1,1510 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Offline POS System</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud POS - Retail Terminal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet" />
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+
   <style>
-    [x-cloak] { display: none !important; }
-    * { box-sizing: border-box; }
-    :root {
-      --bg: #f6f1ea;
-      --surface: rgba(255, 255, 255, 0.86);
-      --surface-strong: #ffffff;
-      --ink: #231f20;
-      --muted: #756b60;
-      --line: rgba(72, 54, 39, 0.12);
-      --brand: #a45f2a;
-      --brand-strong: #7c3f18;
-      --accent: #155e63;
-      --success: #28715d;
-      --shadow: 0 22px 60px rgba(57, 39, 24, 0.13);
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
     }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #171513;
-        --surface: rgba(38, 34, 29, 0.88);
-        --surface-strong: #26221d;
-        --ink: #f8efe4;
-        --muted: #c9b9a7;
-        --line: rgba(255, 239, 220, 0.12);
-        --brand: #d89152;
-        --brand-strong: #f0af70;
-        --accent: #7ed7d0;
-        --success: #75c7a5;
-        --shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+
+    body {
+      background: #f5f7fb;
+      color: #111827;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Structural Shell */
+    .app-workspace {
+      display: flex;
+      width: 100%;
+    }
+
+    .app-workspace.auth-hidden {
+      display: flex;
+    }
+
+    .auth-loading {
+      position: fixed;
+      inset: 0;
+      background: #f5f7fb;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      color: #111827;
+    }
+
+    .auth-loading.hidden {
+      display: none;
+    }
+
+    .auth-loading-card {
+      width: min(360px, calc(100vw - 32px));
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    }
+
+    .auth-spinner {
+      width: 34px;
+      height: 34px;
+      border: 3px solid #dbeafe;
+      border-top-color: #355cff;
+      border-radius: 50%;
+      margin: 0 auto 16px;
+      animation: authSpin 0.8s linear infinite;
+    }
+
+    @keyframes authSpin {
+      to {
+        transform: rotate(360deg);
       }
     }
-    html { scroll-behavior: smooth; }
-    html, body { overflow-x: hidden; }
-    body {
-      min-height: 100vh;
-      background:
-        radial-gradient(circle at top left, rgba(218, 153, 88, 0.28), transparent 32rem),
-        linear-gradient(135deg, var(--bg), #efe4d6 48%, #eef3ef);
-      color: var(--ink);
-      font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      letter-spacing: 0;
+
+    .sidebar {
+      width: 240px;
+      background: #fff;
+      border-right: 1px solid #e5e7eb;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      flex-shrink: 0;
     }
-    h1, h2 { font-family: "Outfit", "Inter", sans-serif; letter-spacing: 0; }
-    table { border-collapse: separate; border-spacing: 0; }
-    button, input, select {
-      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+
+    .brand {
+      font-size: 18px;
+      font-weight: 700;
+      color: #355cff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 10px 30px 10px;
     }
-    button:hover:not(:disabled) { transform: translateY(-1px); }
-    button:active:not(:disabled) { transform: translateY(0) scale(0.99); }
-    .no-hover-lift:hover,
-    .no-hover-lift:active {
-      transform: none !important;
-      box-shadow: none !important;
+
+    .nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
-    .password-toggle {
-      transform: translateY(-50%) !important;
-      transition: color 160ms ease;
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      color: #6b7280;
+      text-decoration: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
     }
-    .password-toggle:hover,
-    .password-toggle:active {
-      transform: translateY(-50%) !important;
-      box-shadow: none !important;
-      background: transparent !important;
+
+    .nav-item:hover,
+    .nav-item.active {
+      background: #eef2ff;
+      color: #355cff;
     }
-    input:focus, select:focus {
-      box-shadow: 0 0 0 4px rgba(164, 95, 42, 0.14);
-      border-color: var(--brand) !important;
+
+    .nav-item.logout {
+      color: #ef4444;
     }
-    .premium-bg {
-      background:
-        radial-gradient(circle at 12% 20%, rgba(164, 95, 42, 0.18), transparent 24rem),
-        radial-gradient(circle at 86% 12%, rgba(21, 94, 99, 0.16), transparent 22rem),
-        linear-gradient(135deg, #fbf7f1, #f2e8db 52%, #eef5f1);
-    }
-    .glass-card {
-      border: 1px solid var(--line);
-      background: var(--surface);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
-    }
-    .soft-card {
-      border: 1px solid var(--line);
-      background: var(--surface-strong);
-      box-shadow: 0 12px 34px rgba(57, 39, 24, 0.08);
-    }
-    .primary-btn {
-      background: linear-gradient(135deg, var(--brand), var(--brand-strong));
-      color: white;
-      box-shadow: 0 12px 28px rgba(124, 63, 24, 0.24);
-    }
-    .secondary-btn {
-      background: #231f20;
-      color: white;
-      box-shadow: 0 12px 28px rgba(35, 31, 32, 0.18);
-    }
-    .ghost-btn { background: rgba(255, 255, 255, 0.7); border: 1px solid var(--line); color: var(--ink); }
-    .table-scroll {
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
-    }
-    .table-scroll::-webkit-scrollbar { height: 8px; }
-    .table-scroll::-webkit-scrollbar-thumb { background: rgba(124, 63, 24, 0.24); border-radius: 999px; }
-    .mobile-safe-modal {
-      max-height: calc(100vh - 2rem);
+
+    .main-canvas {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
       overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
     }
-    .page-enter { animation: fadeSlide 360ms ease both; }
-    .toast-enter { animation: toastIn 420ms cubic-bezier(.2,.8,.2,1) both; }
-    @keyframes fadeSlide {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+
+    .topbar {
+      background: #f5f7fb;
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      z-index: 50;
     }
-    @keyframes toastIn {
-      from { opacity: 0; transform: translateY(-14px) scale(0.96); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #fff;
+      padding: 6px 14px 6px 6px;
+      border-radius: 30px;
+      border: 1px solid #e5e7eb;
+      cursor: pointer;
     }
-    @media (prefers-color-scheme: dark) {
-      body, .premium-bg { background: linear-gradient(135deg, #171513, #211c17 52%, #122123); }
-      .bg-white, .bg-gray-50, .bg-gray-100 { background-color: var(--surface-strong) !important; }
-      .text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700 { color: var(--ink) !important; }
-      .text-gray-600, .text-gray-500, .text-gray-400 { color: var(--muted) !important; }
-      .border, .border-b, .border-t, .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: var(--line) !important; }
-      input, select { background-color: rgba(255, 255, 255, 0.06) !important; color: var(--ink); }
+
+    .user-pill img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
     }
-    @media (max-width: 640px) {
-      body { background-attachment: fixed; }
-      h1 { font-size: 2rem !important; line-height: 1.05 !important; }
-      h2 { line-height: 1.15 !important; }
-      .glass-card, .soft-card { border-radius: 1.25rem !important; }
-      button, input, select { min-height: 44px; }
-      .mobile-full > * { width: 100%; justify-content: center; text-align: center; }
-      .mobile-tight { padding: 1rem !important; }
-      .table-scroll { margin-inline: -0.5rem; padding-inline: 0.5rem; }
+
+    .notification-wrap {
+      position: relative;
+    }
+
+    .notification-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      min-width: 18px;
+      height: 18px;
+      border-radius: 9px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+    }
+
+    .notification-panel {
+      position: absolute;
+      top: 44px;
+      right: 0;
+      width: 300px;
+      max-height: 340px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.12);
+      display: none;
+      z-index: 100;
+    }
+
+    .notification-panel.show {
+      display: block;
+    }
+
+    .notification-item {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f3f4f6;
+      font-size: 12px;
+      color: #334155;
+    }
+
+    .notification-item.has-order {
+      cursor: pointer;
+    }
+
+    .notification-item.has-order:hover {
+      background: #f8fafc;
+    }
+
+    .notification-item strong {
+      display: block;
+      color: #0f172a;
+      font-size: 13px;
+      margin-bottom: 3px;
+    }
+
+    .workspace-content {
+      padding: 32px;
+      flex: 1;
+    }
+
+    .module-panel {
+      display: none;
+      width: 100%;
+    }
+
+    .module-panel.active {
+      display: block;
+    }
+
+    /* Tables & Inputs */
+    .card-box {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      padding: 24px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th {
+      padding-bottom: 14px;
+      color: #6b7280;
+      font-weight: 500;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    td {
+      padding: 14px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #d1fae5;
+      color: #10b981;
+    }
+
+    .input-style {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      outline: none;
+      font-size: 14px;
+    }
+
+    .input-style:focus {
+      border-color: #355cff;
+    }
+
+    .btn-primary {
+      background: #355cff;
+      color: #fff;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    /* POS Terminal Views */
+    .pos-split {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+
+    .catalog-area {
+      flex: 1;
+    }
+
+    .search-wrap {
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .search-wrap i {
+      position: absolute;
+      left: 16px;
+      top: 15px;
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    .search-wrap input {
+      padding-left: 42px;
+    }
+
+    .cat-pills {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .cat-pill {
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      font-size: 13px;
+      color: #6b7280;
+      cursor: pointer;
+    }
+
+    .cat-pill.active {
+      background: #355cff;
+      color: #fff;
+      border-color: #355cff;
+    }
+
+    .grid-items {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+    }
+
+    .item-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      position: relative;
+      transition: 0.2s;
+    }
+
+    .item-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+    }
+
+    .item-card img {
+      width: 100%;
+      height: 100px;
+      object-fit: contain;
+      margin-bottom: 12px;
+    }
+
+    .item-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .item-card p {
+      color: #6b7280;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .btn-add {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #355cff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* Register Sidebar */
+    .ticket-panel {
+      width: 340px;
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      padding: 24px;
+      position: sticky;
+      top: 85px;
+    }
+
+    .basket-list {
+      max-height: 260px;
+      overflow-y: auto;
+      margin: 16px 0;
+    }
+
+    .basket-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .qty-ctrls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .qty-ctrls button {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid #e5e7eb;
+      background: #f5f7fb;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .totals-box {
+      border-top: 1px solid #e5e7eb;
+      padding-top: 16px;
+      font-size: 13px;
+    }
+
+    .sum-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .sum-row.grand {
+      font-size: 16px;
+      font-weight: 700;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 12px;
+      margin-top: 4px;
+    }
+
+    /* Toast Confirmation */
+    .toast-box {
+      position: fixed;
+      bottom: 30px;
+      left: 30px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      padding: 16px 20px;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      z-index: 1000;
+      transform: translateY(150%);
+      transition: 0.3s;
+      min-width: 300px;
+    }
+
+    .toast-box.show {
+      transform: translateY(0);
+    }
+
+    #print-receipt-container {
+      display: none;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+
+      #print-receipt-container,
+      #print-receipt-container * {
+        visibility: visible;
+      }
+
+      #print-receipt-container {
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 300px;
+        margin: 0;
+        padding: 0;
+      }
     }
   </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800" x-data="posApp()" x-init="initApp()">
 
-  <div x-cloak x-show="toast.show" class="fixed left-1/2 top-5 z-[60] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 toast-enter">
-    <div class="glass-card flex items-center gap-3 rounded-2xl px-4 py-3">
-      <div class="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-black text-green-700">OK</div>
+<body>
+
+  <div id="customer-auth-loading" class="auth-loading">
+    <div class="auth-loading-card">
+      <div class="auth-spinner"></div>
+      <h2 style="font-size:18px; margin-bottom:6px;">Verifying access</h2>
+      <p style="font-size:13px; color:#6b7280;">Checking your secure Firebase session.</p>
+    </div>
+  </div>
+
+  <div id="customer-app" class="app-workspace auth-hidden">
+    <aside class="sidebar">
       <div>
-        <p class="font-bold text-gray-900" x-text="toast.title"></p>
-        <p class="text-sm text-gray-500" x-text="toast.message"></p>
+        <div class="brand"><i class="fa-solid fa-cloud"></i><span>Cloud POS</span></div>
+        <nav class="nav-list">
+          <a class="nav-item active" onclick="switchTab('pos')"><i class="fa-solid fa-file-invoice"></i> Order</a>
+          <a class="nav-item" onclick="switchTab('history')"><i class="fa-solid fa-clock-rotate-left"></i> Order
+            History</a>
+          <a class="nav-item" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i> Profile</a>
+        </nav>
       </div>
-    </div>
-  </div>
+      <div class="nav-list">
+        <a class="nav-item logout" onclick="triggerExit()"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+      </div>
+    </aside>
 
-  <div x-cloak x-show="currentView === 'auth'" class="premium-bg min-h-screen page-enter">
-    <div class="mx-auto grid min-h-screen max-w-6xl grid-cols-1 gap-0 px-4 py-4 sm:px-6 lg:grid-cols-2 lg:px-0 lg:py-0">
-      <section class="flex flex-col justify-center px-0 py-8 sm:px-4 sm:py-10 lg:px-10">
-        <div class="max-w-xl">
-          <p class="mb-3 text-sm font-bold uppercase tracking-wide text-blue-600">Modern Local POS</p>
-          <h1 class="text-3xl font-black leading-tight text-gray-950 sm:text-5xl">Order, save, return, and keep every receipt.</h1>
-          <p class="mt-4 text-base leading-7 text-gray-600 sm:mt-5 sm:text-lg sm:leading-8">Create an account before ordering. Your cart and order history stay on this device, even after logout.</p>
-          <div class="mt-6 grid gap-3 sm:mt-8 sm:grid-cols-3">
-            <div class="soft-card rounded-2xl p-4 transition hover:-translate-y-1 hover:shadow-lg">
-              <p class="text-sm font-bold text-gray-900">Private access</p>
-              <p class="mt-1 text-sm text-gray-500">Users see ordering only.</p>
-            </div>
-            <div class="soft-card rounded-2xl p-4 transition hover:-translate-y-1 hover:shadow-lg">
-              <p class="text-sm font-bold text-gray-900">Saved carts</p>
-              <p class="mt-1 text-sm text-gray-500">Return to unfinished orders.</p>
-            </div>
-            <div class="soft-card rounded-2xl p-4 transition hover:-translate-y-1 hover:shadow-lg">
-              <p class="text-sm font-bold text-gray-900">Admin role</p>
-              <p class="mt-1 text-sm text-gray-500">Dashboard opens only for admin login.</p>
-            </div>
-          </div>
+    <div class="main-canvas">
+      <header class="topbar">
+        <div>
+          <h1 id="view-title" style="font-size:20px; font-weight:600;">Order Menu</h1>
+          <p id="view-sub" style="font-size:12px; color:#6b7280;">Point of Sale checkout space</p>
         </div>
-      </section>
-
-      <section class="flex items-center justify-center px-0 py-4 sm:px-4 sm:py-10 lg:px-10">
-        <div class="glass-card mobile-tight w-full max-w-md rounded-3xl p-6">
-          <div class="mb-6 flex rounded-2xl bg-white/60 p-1 shadow-inner">
-            <button @click="setAuthMode('login')" :class="authMode === 'login' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-900'" class="flex-1 rounded-md px-4 py-2 text-sm font-bold transition">Login</button>
-            <button @click="setAuthMode('signup')" :class="authMode === 'signup' ? 'bg-white text-gray-950 shadow-sm' : 'text-gray-500 hover:text-gray-900'" class="flex-1 rounded-md px-4 py-2 text-sm font-bold transition">Sign Up</button>
-          </div>
-
-          <form x-show="authMode === 'login'" @submit.prevent="signIn()" class="space-y-4">
-            <div>
-              <h2 class="text-2xl font-black text-gray-950">Welcome back</h2>
-              <p class="mt-1 text-sm text-gray-500">Sign in to continue to your saved POS account.</p>
-            </div>
-            <label class="block">
-              <span class="mb-1 block text-sm font-medium text-gray-700">Email</span>
-              <input type="email" x-model.trim="loginForm.email" required autocomplete="username" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
-            </label>
-            <label class="block">
-              <span class="mb-1 block text-sm font-medium text-gray-700">Password</span>
-              <div class="relative">
-                <input :type="showLoginPassword ? 'text' : 'password'" x-model="loginForm.password" required autocomplete="current-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 pr-12 focus:outline-none">
-                <button type="button" @click="showLoginPassword = !showLoginPassword" class="password-toggle absolute right-2 top-1/2 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500" :aria-label="showLoginPassword ? 'Hide password' : 'Show password'">
-                  <svg x-show="!showLoginPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-                  <svg x-show="showLoginPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.43A9.92 9.92 0 0 1 12 4.25c6 0 9.75 6.75 9.75 6.75a18.4 18.4 0 0 1-3.05 3.83M6.53 6.53C3.8 8.38 2.25 12 2.25 12S6 18.75 12 18.75c1.64 0 3.09-.5 4.33-1.23"/></svg>
-                </button>
+        <div style="display:flex; align-items:center; gap:20px;">
+          <div class="notification-wrap">
+            <button class="notification-btn" onclick="toggleNotifications()" aria-label="Notifications">
+              <i class="fa-regular fa-bell" style="font-size:16px;"></i>
+              <span id="notification-badge" class="notification-badge">0</span>
+            </button>
+            <div id="notification-panel" class="notification-panel">
+              <div id="notification-list">
+                <div class="notification-item">No notifications yet.</div>
               </div>
-            </label>
-            <div class="-mt-2 flex justify-end">
-              <button type="button" @click="openForgotPassword()" class="no-hover-lift text-sm font-bold text-amber-800 hover:text-amber-900">
-                Forgot Password?
-              </button>
             </div>
-            <p x-show="authError" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" x-text="authError"></p>
-            <button class="primary-btn w-full rounded-xl px-4 py-3 font-bold">Login</button>
-          </form>
-
-          <form x-show="authMode === 'signup'" @submit.prevent="signUp()" class="space-y-4">
-            <div>
-              <h2 class="text-2xl font-black text-gray-950">Create account</h2>
-              <p class="mt-1 text-sm text-gray-500">Make your customer account before ordering.</p>
-            </div>
-            <label class="block">
-              <span class="mb-1 block text-sm font-medium text-gray-700">Full Name</span>
-              <input type="text" x-model.trim="signupForm.name" required autocomplete="name" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
-            </label>
-            <label class="block">
-              <span class="mb-1 block text-sm font-medium text-gray-700">Email</span>
-              <input type="email" x-model.trim="signupForm.email" required autocomplete="email" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
-            </label>
-            <label class="block">
-              <span class="mb-1 block text-sm font-medium text-gray-700">Password</span>
-              <div class="relative">
-                <input :type="showSignupPassword ? 'text' : 'password'" x-model="signupForm.password" required minlength="4" autocomplete="new-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 pr-12 focus:outline-none">
-                <button type="button" @click="showSignupPassword = !showSignupPassword" class="password-toggle absolute right-2 top-1/2 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500" :aria-label="showSignupPassword ? 'Hide password' : 'Show password'">
-                  <svg x-show="!showSignupPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-                  <svg x-show="showSignupPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.43A9.92 9.92 0 0 1 12 4.25c6 0 9.75 6.75 9.75 6.75a18.4 18.4 0 0 1-3.05 3.83M6.53 6.53C3.8 8.38 2.25 12 2.25 12S6 18.75 12 18.75c1.64 0 3.09-.5 4.33-1.23"/></svg>
-                </button>
-              </div>
-            </label>
-            <p x-show="authError" class="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" x-text="authError"></p>
-            <button class="secondary-btn w-full rounded-xl px-4 py-3 font-bold">Create Account</button>
-          </form>
-        </div>
-      </section>
-    </div>
-  </div>
-
-  <div x-cloak x-show="currentView === 'pos'" class="premium-bg page-enter flex min-h-screen flex-col xl:flex-row">
-    <main class="flex flex-1 flex-col">
-      <header class="glass-card m-3 rounded-3xl p-4 md:m-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div class="mobile-full flex flex-wrap items-center gap-3">
-            <h1 class="text-3xl font-black text-gray-900">Order Menu</h1>
-            <button x-show="currentUser?.role === 'admin'" @click="switchView('admin')" class="rounded-full border border-amber-200 bg-amber-50/90 px-4 py-2 text-sm font-bold text-amber-900 shadow-sm hover:border-amber-300 hover:bg-amber-100 hover:shadow-md">
-              Back to Dashboard
-            </button>
-            <div x-show="currentUser?.role !== 'admin'" class="rounded-full bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800" x-text="currentUser ? currentUser.name : ''"></div>
-            <button @click="signOut()" class="secondary-btn rounded-xl px-4 py-2 font-semibold">
-              Logout
-            </button>
           </div>
-          <div class="flex gap-2 overflow-x-auto pb-1">
-            <button @click="activeCategory = 'All'"
-              :class="activeCategory === 'All' ? 'primary-btn' : 'ghost-btn hover:bg-white'"
-              class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold">
-              All
-            </button>
-            <template x-for="cat in categories" :key="cat.id">
-              <button @click="activeCategory = cat.name"
-                :class="activeCategory === cat.name ? 'primary-btn' : 'ghost-btn hover:bg-white'"
-                class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold"
-                x-text="cat.name">
-              </button>
-            </template>
+          <div class="user-pill" onclick="switchTab('profile')">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&fit=crop&q=80" alt="Avatar" />
+            <span id="top-name" style="font-size:13px; font-weight:500;">Juan Dela Cruz</span>
+            <i class="fa-solid fa-chevron-down" style="font-size:10px; margin-left:4px; color:#6b7280;"></i>
           </div>
         </div>
       </header>
 
-      <section class="flex-1 overflow-y-auto p-3 sm:p-5">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-          <template x-for="product in filteredProducts" :key="product.id">
-            <button @click="addToCart(product)" class="soft-card overflow-hidden rounded-3xl text-left transition hover:-translate-y-1 hover:shadow-xl">
-              <div class="flex h-36 items-center justify-center bg-stone-100 sm:h-40">
-                <template x-if="product.image">
-                  <img :src="product.image" class="h-full w-full object-cover" alt="">
-                </template>
-                <template x-if="!product.image">
-                  <span class="text-sm font-semibold text-gray-400">No image</span>
-                </template>
+      <main class="workspace-content">
+        <div id="tab-pos" class="module-panel active">
+          <div class="pos-split">
+            <div class="catalog-area">
+              <div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text"
+                  class="input-style" placeholder="Search menu inventory..." oninput="queryCatalog(this.value)" /></div>
+              <div class="cat-pills" id="cat-mount">
+                <button class="cat-pill active" onclick="filterCat('All', this)">All</button>
+                <button class="cat-pill" onclick="filterCat('Meals', this)">Meals</button>
+                <button class="cat-pill" onclick="filterCat('Beverages', this)">Beverages</button>
+                <button class="cat-pill" onclick="filterCat('Snacks', this)">Snacks</button>
+                <button class="cat-pill" onclick="filterCat('Desserts', this)">Desserts</button>
               </div>
-              <div class="p-3">
-                <h2 class="min-h-10 text-sm font-bold leading-tight text-gray-900" x-text="product.name"></h2>
-                <p class="mt-2 font-bold text-amber-700" x-text="formatMoney(product.price)"></p>
+              <div class="grid-items" id="catalog-mount"></div>
+            </div>
+
+            <aside class="ticket-panel" style="display:flex; flex-direction:column; height: 100%;">
+              <div>
+                <h3 style="font-size:20px; font-weight:700; color:#0f172a;">Current Order</h3>
+                <p id="ticket-id" style="font-size:12px; color:#64748b; margin-top:4px;">Ticket: #1001</p>
               </div>
-            </button>
-          </template>
-          <div x-show="filteredProducts.length === 0" class="soft-card col-span-full rounded-3xl p-10 text-center text-gray-500">
-            No products are available yet.
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <aside class="glass-card m-3 flex w-auto flex-col rounded-3xl md:m-5 xl:sticky xl:top-5 xl:max-h-[calc(100vh-2.5rem)] xl:w-96">
-      <div class="border-b p-5">
-        <h2 class="text-xl font-bold text-gray-900">Current Order</h2>
-        <p class="mt-1 text-xs text-gray-500" x-text="'Ticket: #' + ticketNumber"></p>
-      </div>
-
-      <div class="flex-1 space-y-4 overflow-y-auto p-4">
-        <template x-for="item in cart" :key="item.id">
-          <div class="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
-            <div class="min-w-0 flex-1">
-              <h3 class="truncate text-sm font-semibold text-gray-900" x-text="item.name"></h3>
-              <p class="text-xs text-gray-500" x-text="formatMoney(item.price)"></p>
-            </div>
-            <div class="flex items-center gap-2 rounded-xl bg-stone-100 p-1">
-              <button @click="decreaseQty(item.id)" class="flex h-7 w-7 items-center justify-center rounded bg-white font-bold text-red-500 shadow-sm">-</button>
-              <span class="w-5 text-center text-sm font-bold" x-text="item.quantity"></span>
-              <button @click="increaseQty(item.id)" class="flex h-7 w-7 items-center justify-center rounded bg-white font-bold text-blue-500 shadow-sm">+</button>
-            </div>
-            <p class="ml-auto w-20 text-right text-sm font-bold" x-text="formatMoney(item.price * item.quantity)"></p>
-          </div>
-        </template>
-        <div x-show="cart.length === 0" class="rounded-2xl bg-white/60 py-10 text-center text-sm text-gray-400">
-          Tap items to add them here.
-        </div>
-      </div>
-
-      <div class="border-t p-5">
-        <div class="mb-2 flex justify-between text-sm">
-          <span class="text-gray-600">Subtotal</span>
-          <span class="font-semibold" x-text="formatMoney(cartSubtotal)"></span>
-        </div>
-        <div class="mb-2 flex justify-between text-sm">
-          <span class="text-gray-600">Discount</span>
-          <span class="font-semibold text-green-700" x-text="'-' + formatMoney(discountAmount)"></span>
-        </div>
-        <div class="mb-4 flex justify-between border-t pt-3">
-          <span class="text-lg font-bold">Total</span>
-          <span class="text-2xl font-bold text-amber-700" x-text="formatMoney(cartTotal)"></span>
-        </div>
-
-        <label class="mb-4 block">
-          <span class="mb-1 block text-sm font-medium text-gray-700">Customer Payment</span>
-          <input type="number" min="0" step="0.01" x-model.number="customerMoney" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none" placeholder="Enter amount paid">
-        </label>
-
-        <div x-show="customerMoney > 0" class="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
-          <div class="flex justify-between">
-            <span class="text-sm font-medium text-green-800">Change</span>
-            <span class="font-bold text-green-700" x-text="formatMoney(change)"></span>
+              <div class="basket-list" id="basket-mount"
+                style="flex:1; display:flex; flex-direction:column; min-height: 240px; margin-top:24px;">
+                <!-- JS inj -->
+              </div>
+              <div class="totals-box" style="border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top:auto;">
+                <div class="sum-row" style="color:#64748b;"><span>Subtotal</span><strong id="basket-sub"
+                    style="color:#0f172a;">₱0.00</strong></div>
+                <div class="sum-row" style="color:#64748b;"><span>Discount</span><strong
+                    style="color:#10b981">-₱0.00</strong></div>
+                <div class="sum-row grand" style="margin-top:16px; align-items:center;">
+                  <span style="font-size:18px; font-weight:700; color:#0f172a;">Total</span>
+                  <strong id="basket-total" style="font-size:24px; font-weight:800; color:#0f172a;">₱0.00</strong>
+                </div>
+              </div>
+              <div style="margin-top:24px;">
+                <label
+                  style="font-size:13px; font-weight:600; display:block; margin-bottom:8px; color:#334155;">Customer
+                  Payment</label>
+                <input type="number" id="tendered-cash" class="input-style" placeholder="Enter amount paid"
+                  oninput="evalTender()" style="margin-bottom:12px;" />
+                <div id="payment-error"
+                  style="color: #ef4444; font-size: 11px; margin-top: -8px; margin-bottom: 8px; display: none;">
+                  Insufficient cash tendered.</div>
+                <div style="display:flex; gap:12px;">
+                  <button
+                    style="background:#f1f5f9; color:#334155; border:none; padding:14px 16px; border-radius:10px; font-weight:700; font-size:14px; cursor:pointer; flex: 0 0 30%;"
+                    onclick="clearBasket()">Clear</button>
+                  <button
+                    style="background:#787f87; color:#fff; border:none; padding:14px 16px; border-radius:10px; font-weight:700; font-size:14px; cursor:pointer; flex: 1;"
+                    onclick="resolveTransaction()">Charge</button>
+                </div>
+              </div>
+            </aside>
           </div>
         </div>
 
-        <div class="grid grid-cols-[auto_1fr] gap-2">
-          <button @click="clearCart()" class="rounded-xl bg-red-100 px-4 py-3 font-bold text-red-700 transition hover:bg-red-200">Clear</button>
-          <button @click="checkout()" :disabled="cart.length === 0" class="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-lg font-bold text-white shadow-md transition hover:bg-emerald-700 disabled:opacity-50">Charge</button>
-        </div>
-        <button @click="showOrderHistory()" class="primary-btn mt-2 w-full rounded-xl px-4 py-3 font-bold">
-          Order History
-        </button>
-      </div>
-    </aside>
-  </div>
-
-  <div x-cloak x-show="currentView === 'admin'" class="premium-bg page-enter min-h-screen p-3 sm:p-4 md:p-8">
-    <div class="mx-auto max-w-6xl">
-      <div class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 class="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p class="mt-1 text-sm text-gray-500" x-text="currentUser ? 'Signed in as ' + currentUser.email : ''"></p>
-        </div>
-        <div class="mobile-full flex flex-wrap gap-3">
-          <button @click="switchView('pos')" class="primary-btn rounded-xl px-6 py-3 font-bold">
-            Ordering Page
-          </button>
-          <button @click="signOut()" class="secondary-btn rounded-xl px-6 py-3 font-bold">
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
-        <section class="soft-card mobile-tight h-fit rounded-3xl p-6">
-          <h2 class="mb-4 text-xl font-semibold" x-text="isEditing ? 'Edit Product' : 'Add New Product'"></h2>
-          <form @submit.prevent="saveProduct" class="space-y-4">
-            <label class="block">
-              <span class="block text-sm font-medium text-gray-700">Product Image</span>
-              <input type="file" accept="image/*" @change="handleImageUpload" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:rounded-xl file:border-0 file:bg-amber-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-amber-800 hover:file:bg-amber-100">
-            </label>
-            <template x-if="formData.image">
-              <div class="relative inline-block">
-                <img :src="formData.image" class="h-24 w-24 rounded-md border object-cover shadow-sm" alt="">
-                <button type="button" @click="formData.image = null" class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white">&times;</button>
-              </div>
-            </template>
-
-            <label class="block">
-              <span class="block text-sm font-medium text-gray-700">Product Name</span>
-              <input type="text" x-model.trim="formData.name" required placeholder="e.g., Wintermelon Milk Tea" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
-            </label>
-
-            <div>
-              <span class="block text-sm font-medium text-gray-700">Category</span>
-              <div class="mt-1 flex gap-2">
-                <select x-model="formData.category" required class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
-                  <option value="" disabled>Select a category</option>
-                  <template x-for="cat in categories" :key="cat.id">
-                    <option :value="cat.name" x-text="cat.name"></option>
-                  </template>
-                </select>
-                <button type="button" @click="addNewCategory()" class="ghost-btn rounded-xl px-4 py-2 font-bold" title="Add category">+</button>
-              </div>
-              <div class="mt-3 grid grid-cols-2 gap-2">
-                <template x-for="cat in categories" :key="cat.id">
-                  <div class="flex items-center justify-between rounded-full bg-stone-100 px-3 py-2 text-sm text-gray-700">
-                    <span class="truncate" x-text="cat.name"></span>
-                    <button type="button" @click="deleteCategory(cat.id)" class="ml-2 font-bold text-gray-400 hover:text-red-600">&times;</button>
-                  </div>
-                </template>
-              </div>
-            </div>
-
-            <label class="block">
-              <span class="block text-sm font-medium text-gray-700">Price</span>
-              <input type="number" min="0" step="0.01" x-model="formData.price" required placeholder="0.00" class="mt-1 w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none">
-            </label>
-
-            <div class="grid gap-3 pt-2 sm:grid-cols-2">
-              <button type="submit" class="primary-btn flex-1 rounded-xl px-4 py-3 font-bold" x-text="isEditing ? 'Update Item' : 'Save Item'"></button>
-              <button type="button" x-show="isEditing" @click="resetForm()" class="ghost-btn flex-1 rounded-xl px-4 py-3 font-bold">Cancel</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="soft-card mobile-tight rounded-3xl p-6 lg:col-span-2">
-          <h2 class="mb-4 text-xl font-semibold">Current Menu</h2>
-          <div class="table-scroll overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-sm">
-              <thead class="bg-gray-50">
+        <div id="tab-history" class="module-panel">
+          <div style="margin-bottom:24px;">
+            <h2 style="font-size:20px; font-weight:700; color:#0f172a; margin-bottom:4px;">All Orders</h2>
+          </div>
+          <div style="background:#f8fafc; border-radius:12px; padding:4px;">
+            <table style="width:100%;">
+              <thead>
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Image</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Category</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Price</th>
-                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
+                  <th
+                    style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    #</th>
+                  <th
+                    style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Date</th>
+                  <th
+                    style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Items</th>
+                  <th
+                    style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Payment</th>
+                  <th
+                    style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Order</th>
+                  <th
+                    style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Total</th>
+                  <th
+                    style="padding:12px 16px; border:none; font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+                    Action</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-200 bg-white">
-                <template x-for="product in products" :key="product.id">
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3">
-                      <template x-if="product.image"><img :src="product.image" class="h-10 w-10 rounded-md border object-cover" alt=""></template>
-                      <template x-if="!product.image"><div class="flex h-10 w-10 items-center justify-center rounded-md border bg-gray-100 text-xs text-gray-400">No img</div></template>
-                    </td>
-                    <td class="px-4 py-3 font-medium text-gray-900" x-text="product.name"></td>
-                    <td class="px-4 py-3"><span class="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800" x-text="product.category"></span></td>
-                    <td class="px-4 py-3 font-semibold" x-text="formatMoney(product.price)"></td>
-                    <td class="px-4 py-3 text-right">
-                      <button @click="editProduct(product)" class="mr-4 font-medium text-indigo-600 hover:text-indigo-900">Edit</button>
-                      <button @click="deleteProduct(product.id)" class="font-medium text-red-600 hover:text-red-900">Delete</button>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="products.length === 0">
-                  <td colspan="5" class="px-4 py-8 text-center text-gray-500">No products found. Add some items.</td>
-                </tr>
-              </tbody>
+              <tbody id="history-mount" style="background:#fff;"></tbody>
             </table>
           </div>
-        </section>
+        </div>
 
-        <section class="soft-card mobile-tight rounded-3xl p-6 lg:col-span-3">
-          <div class="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 class="text-xl font-semibold">Discount</h2>
-              <p class="text-sm text-gray-500">Applied to new register orders.</p>
+        <div id="tab-profile" class="module-panel">
+          <div style="margin-bottom: 24px;">
+            <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 4px;">My Profile</h2>
+            <p style="font-size: 13px; color: #6b7280;">Update your personal information.</p>
+          </div>
+          <div style="display:grid; grid-template-columns: 280px 1fr; gap:24px; align-items: stretch;">
+            <div class="card-box"
+              style="display:flex; flex-direction:column; align-items:center; text-align:center; justify-content:center; min-height:100%; padding: 40px 20px;">
+              <div style="position: relative; margin-bottom: 16px;">
+                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&fit=crop&q=80"
+                  style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;" />
+                <div
+                  style="position: absolute; bottom: 0; right: 0; background: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer;">
+                  <i class="fa-solid fa-camera" style="font-size: 11px; color: #4b5563;"></i>
+                </div>
+              </div>
+              <h3 id="prof-disp-name" style="font-size: 18px; margin-bottom: 4px;">Juan Dela Cruz</h3>
+              <p style="font-size: 13px; color: #6b7280; margin-bottom: 24px;">Customer</p>
+              <button
+                style="border: 1px solid #e5e7eb; background: #fff; color: #355cff; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; transition: 0.2s;"
+                onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'"
+                onclick="promptPasswordChange()">Change
+                Password</button>
             </div>
-            <form @submit.prevent="saveDiscount()" class="grid gap-2 sm:grid-cols-[160px_160px_auto]">
-              <select x-model="discountForm.type" class="rounded-xl border border-gray-300 px-3 py-3">
-                <option value="percent">Percent</option>
-                <option value="fixed">Fixed amount</option>
-              </select>
-              <input type="number" min="0" step="0.01" x-model.number="discountForm.value" class="rounded-xl border border-gray-300 px-3 py-3">
-              <button class="rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white hover:bg-emerald-700">Save Discount</button>
-            </form>
-          </div>
-        </section>
 
-        <section class="soft-card mobile-tight rounded-3xl p-6 lg:col-span-3">
-          <h2 class="mb-4 text-xl font-semibold">Sales History</h2>
-          <div class="table-scroll overflow-x-auto">
-            <table class="min-w-[1080px] w-full divide-y divide-gray-200 text-sm">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">#</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Date</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Customer</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Items</th>
-                  <th class="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500">Total</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Payment Status</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Order Status</th>
-                  <th class="px-3 py-2 text-center text-xs font-medium uppercase text-gray-500">Details</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-200 bg-white">
-                <template x-for="sale in sales" :key="sale.id">
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-3 py-2 font-semibold" x-text="sale.id"></td>
-                    <td class="px-3 py-2 text-gray-500" x-text="formatDate(sale.timestamp)"></td>
-                    <td class="px-3 py-2 text-gray-600" x-text="sale.customerName || 'Guest'"></td>
-                    <td class="px-3 py-2" x-text="sale.items.length + ' item(s)'"></td>
-                    <td class="px-3 py-2 text-right font-bold" x-text="formatMoney(sale.total)"></td>
-                    <td class="px-3 py-2">
-                      <select x-model="sale.paymentStatus" @change="updateSale(sale)" class="rounded-xl border border-gray-300 px-2 py-1">
-                        <option>Paid</option>
-                        <option>Unpaid</option>
-                      </select>
-                    </td>
-                    <td class="px-3 py-2">
-                      <select x-model="sale.orderStatus" @change="updateSale(sale)" class="rounded-xl border border-gray-300 px-2 py-1">
-                        <option>Preparing</option>
-                        <option>Served</option>
-                      </select>
-                    </td>
-                    <td class="px-3 py-2 text-center">
-                      <button @click="showSaleDetails(sale)" class="font-semibold text-blue-600 hover:text-blue-800">View</button>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="sales.length === 0">
-                  <td colspan="8" class="px-3 py-8 text-center text-gray-500">No sales yet.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <div x-cloak x-show="currentView === 'history'" class="premium-bg page-enter min-h-screen p-3 sm:p-4 md:p-8">
-    <div class="mx-auto max-w-6xl">
-      <div class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 class="text-3xl font-bold text-gray-900">Order History</h1>
-          <p class="mt-1 text-sm text-gray-500" x-text="currentUser ? 'Saved for ' + currentUser.name : ''"></p>
-        </div>
-        <div class="mobile-full flex flex-wrap gap-3">
-          <button @click="backToPos()" class="primary-btn rounded-xl px-6 py-3 font-bold">
-            Back to Ordering
-          </button>
-          <button @click="signOut()" class="secondary-btn rounded-xl px-6 py-3 font-bold">
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <section class="soft-card mobile-tight rounded-3xl p-6">
-        <h2 class="mb-4 text-2xl font-bold text-gray-900">All Orders</h2>
-        <div class="table-scroll overflow-x-auto">
-          <table class="min-w-[900px] w-full text-sm">
-            <thead class="border-b bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600">#</th>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600">Date</th>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-600">Items</th>
-                <th class="px-4 py-3 text-center text-xs font-medium uppercase text-gray-600">Payment</th>
-                <th class="px-4 py-3 text-center text-xs font-medium uppercase text-gray-600">Order</th>
-                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-600">Total</th>
-                <th class="px-4 py-3 text-center text-xs font-medium uppercase text-gray-600">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-              <template x-for="sale in allSales" :key="sale.id">
-                <tr class="hover:bg-gray-50">
-                  <td class="px-4 py-3 font-semibold" x-text="sale.id"></td>
-                  <td class="px-4 py-3 text-gray-600" x-text="formatDate(sale.timestamp)"></td>
-                  <td class="px-4 py-3 text-gray-700">
-                    <template x-for="item in sale.items" :key="item.id">
-                      <div><span x-text="item.name"></span> x <span x-text="item.quantity"></span></div>
-                    </template>
-                  </td>
-                  <td class="px-4 py-3 text-center"><span :class="badgeClass(sale.paymentStatus)" class="inline-block rounded-full px-3 py-1 text-xs font-semibold" x-text="sale.paymentStatus"></span></td>
-                  <td class="px-4 py-3 text-center"><span :class="badgeClass(sale.orderStatus)" class="inline-block rounded-full px-3 py-1 text-xs font-semibold" x-text="sale.orderStatus"></span></td>
-                  <td class="px-4 py-3 text-right font-semibold" x-text="formatMoney(sale.total)"></td>
-                  <td class="px-4 py-3 text-center">
-                    <button @click="showSaleDetails(sale)" class="mr-4 font-semibold text-blue-600 hover:text-blue-800">View</button>
-                    <button @click="printReceipt(sale)" class="font-semibold text-green-600 hover:text-green-800">Print</button>
-                  </td>
-                </tr>
-              </template>
-              <tr x-show="allSales.length === 0">
-                <td colspan="7" class="px-4 py-8 text-center text-gray-500">No order history available.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  </div>
-
-  <div x-cloak x-show="selectedSale" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4" @keydown.escape.window="closeSaleDetails()">
-    <div class="glass-card mobile-safe-modal mobile-tight w-full max-w-lg rounded-3xl p-6">
-      <div class="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h2 class="text-2xl font-bold text-gray-900">Order Details #<span x-text="selectedSale?.id"></span></h2>
-          <p class="mt-1 text-sm text-gray-500" x-text="selectedSale ? formatDate(selectedSale.timestamp) : ''"></p>
-          <p class="mt-1 text-sm font-semibold text-gray-700" x-show="selectedSale?.customerName" x-text="selectedSale?.customerName"></p>
-        </div>
-        <button @click="closeSaleDetails()" class="ghost-btn rounded-xl px-3 py-1 text-xl font-bold leading-none text-gray-500">&times;</button>
-      </div>
-      <div class="max-h-80 space-y-3 overflow-y-auto">
-        <template x-for="item in selectedSale?.items || []" :key="item.id">
-          <div class="flex items-center justify-between gap-4 border-b border-gray-200 pb-3 text-sm">
-            <div>
-              <p class="font-semibold text-gray-900" x-text="item.name"></p>
-              <p class="text-gray-500"><span x-text="formatMoney(item.price)"></span> x <span x-text="item.quantity"></span></p>
+            <div class="card-box">
+              <div style="display:flex; flex-direction:column; gap:16px;">
+                <div><label style="font-size:12px; display:block; margin-bottom:4px; font-weight:500;">Full
+                    Name</label><input type="text" id="prof-name" class="input-style" /></div>
+                <div><label
+                    style="font-size:12px; display:block; margin-bottom:4px; font-weight:500;">Username</label><input
+                    type="text" id="prof-username" class="input-style" readonly style="background:#f3f4f6;" /></div>
+                <div><label style="font-size:12px; display:block; margin-bottom:4px; font-weight:500;">Email
+                    Address</label><input type="text" id="prof-email" class="input-style" readonly
+                    style="background:#f3f4f6;" /></div>
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap: 12px; margin-top: 24px;">
+                <button
+                  style="border: 1px solid #e5e7eb; background: #fff; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; color: #374151;"
+                  onclick="resetProfileForm()">Cancel</button>
+                <button class="btn-primary" onclick="syncProfile()">Save Changes</button>
+              </div>
             </div>
-            <p class="font-bold text-gray-900" x-text="formatMoney(item.price * item.quantity)"></p>
           </div>
-        </template>
-      </div>
-      <div class="mt-5 space-y-2 border-t pt-4 text-sm">
-        <div class="flex justify-between"><span class="text-gray-600">Subtotal</span><span class="font-semibold" x-text="formatMoney(selectedSale?.subtotal || selectedSale?.total)"></span></div>
-        <div class="flex justify-between"><span class="text-gray-600">Discount</span><span class="font-semibold text-green-700" x-text="'-' + formatMoney(selectedSale?.discountAmount || 0)"></span></div>
-        <div class="flex justify-between text-lg"><span class="font-bold">Total</span><span class="font-bold text-amber-700" x-text="formatMoney(selectedSale?.total)"></span></div>
-      </div>
-      <div class="mt-5 flex flex-col justify-end gap-3 sm:flex-row">
-        <button @click="closeSaleDetails()" class="ghost-btn rounded-xl px-4 py-2 text-sm font-bold">Close</button>
-        <button @click="printReceipt(selectedSale)" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Print Receipt</button>
-      </div>
+        </div>
+
+      </main>
     </div>
   </div>
 
-  <div x-cloak x-show="showForgotPassword" class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4" @keydown.escape.window="closeForgotPassword()">
-    <div x-show="showForgotPassword" x-transition class="glass-card mobile-safe-modal mobile-tight w-full max-w-md rounded-3xl p-6">
-      <div class="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <p class="text-sm font-bold uppercase tracking-wide text-amber-700">Account Recovery</p>
-          <h2 class="mt-1 text-2xl font-black text-gray-950">Reset password</h2>
-          <p class="mt-1 text-sm text-gray-500" x-text="forgotPassword.step === 'lookup' ? 'Enter your registered email to find your account.' : 'Create a new password for your account.'"></p>
-        </div>
-        <button type="button" @click="closeForgotPassword()" class="ghost-btn rounded-xl px-3 py-1 text-xl font-bold leading-none text-gray-500">&times;</button>
-      </div>
-
-      <form x-show="forgotPassword.step === 'lookup'" @submit.prevent="findResetAccount()" class="space-y-4">
-        <label class="block">
-          <span class="mb-1 block text-sm font-medium text-gray-700">Email</span>
-          <input type="email" x-model.trim="forgotPassword.email" required autocomplete="username" class="w-full rounded-xl border border-gray-300 px-3 py-3 focus:outline-none" placeholder="you@example.com">
-        </label>
-        <p x-show="forgotPassword.error" class="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" x-text="forgotPassword.error"></p>
-        <button class="primary-btn w-full rounded-xl px-4 py-3 font-bold">Find Account</button>
-      </form>
-
-      <form x-show="forgotPassword.step === 'reset'" @submit.prevent="resetPassword()" class="space-y-4">
-        <div class="rounded-2xl bg-amber-50 px-4 py-3">
-          <p class="text-sm font-bold text-amber-900" x-text="forgotPassword.userName"></p>
-          <p class="text-xs text-amber-700" x-text="forgotPassword.email"></p>
-        </div>
-        <label class="block">
-          <span class="mb-1 block text-sm font-medium text-gray-700">New Password</span>
-          <div class="relative">
-            <input :type="showResetPassword ? 'text' : 'password'" x-model="forgotPassword.newPassword" required minlength="4" autocomplete="new-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 pr-12 focus:outline-none">
-            <button type="button" @click="showResetPassword = !showResetPassword" class="password-toggle absolute right-2 top-1/2 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500" :aria-label="showResetPassword ? 'Hide password' : 'Show password'">
-              <svg x-show="!showResetPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-              <svg x-show="showResetPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.43A9.92 9.92 0 0 1 12 4.25c6 0 9.75 6.75 9.75 6.75a18.4 18.4 0 0 1-3.05 3.83M6.53 6.53C3.8 8.38 2.25 12 2.25 12S6 18.75 12 18.75c1.64 0 3.09-.5 4.33-1.23"/></svg>
-            </button>
-          </div>
-        </label>
-        <label class="block">
-          <span class="mb-1 block text-sm font-medium text-gray-700">Confirm Password</span>
-          <div class="relative">
-            <input :type="showConfirmResetPassword ? 'text' : 'password'" x-model="forgotPassword.confirmPassword" required minlength="4" autocomplete="new-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 pr-12 focus:outline-none">
-            <button type="button" @click="showConfirmResetPassword = !showConfirmResetPassword" class="password-toggle absolute right-2 top-1/2 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500" :aria-label="showConfirmResetPassword ? 'Hide password' : 'Show password'">
-              <svg x-show="!showConfirmResetPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-              <svg x-show="showConfirmResetPassword" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18"/><path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path stroke-linecap="round" stroke-linejoin="round" d="M9.88 4.43A9.92 9.92 0 0 1 12 4.25c6 0 9.75 6.75 9.75 6.75a18.4 18.4 0 0 1-3.05 3.83M6.53 6.53C3.8 8.38 2.25 12 2.25 12S6 18.75 12 18.75c1.64 0 3.09-.5 4.33-1.23"/></svg>
-            </button>
-          </div>
-        </label>
-        <p x-show="forgotPassword.error" class="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700" x-text="forgotPassword.error"></p>
-        <div class="flex flex-col gap-3 sm:flex-row">
-          <button type="button" @click="forgotPassword.step = 'lookup'; forgotPassword.error = ''" class="ghost-btn rounded-xl px-4 py-3 font-bold sm:w-36">Back</button>
-          <button class="primary-btn flex-1 rounded-xl px-4 py-3 font-bold">Reset Password</button>
-        </div>
-      </form>
+  <div class="toast-box" id="app-toast">
+    <div
+      style="background: #10b981; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <i class="fa-solid fa-check" style="font-size: 12px;"></i>
     </div>
+    <div style="flex:1;">
+      <h4 id="toast-title" style="font-size: 13px; color: #111827; margin: 0; font-weight: 600;">Order Successful!</h4>
+      <p id="toast-txt" style="font-size: 11px; color: #6b7280; margin: 2px 0 0 0;">Your order #1290 has been placed.
+      </p>
+    </div>
+    <i class="fa-solid fa-xmark" style="color: #9ca3af; cursor: pointer;"
+      onclick="document.getElementById('app-toast').classList.remove('show')"></i>
   </div>
 
   <script>
-    const db = new Dexie("POS_LocalDB");
-    db.version(6).stores({
-      products: "++id, name, category, price",
-      categories: "++id, name",
-      sales: "++id, userId, timestamp, total, paid, change, paymentStatus, orderStatus",
-      users: "++id, &email, role",
-      settings: "&key"
+    const firebaseConfig = {
+      apiKey: "AIzaSyAwloWQC4wzR5z3BIWPqQxoyR-2835jKoQ",
+      authDomain: "pos-web-system-6ab41.firebaseapp.com",
+      projectId: "pos-web-system-6ab41",
+      storageBucket: "pos-web-system-6ab41.firebasestorage.app",
+      messagingSenderId: "1074382185012",
+      appId: "1:1074382185012:web:c13960df381bb9d52fe061",
+      measurementId: "G-PYZMJ2NP6Z"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const authReady = auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(error => {
+      console.error('Unable to set Firebase auth persistence:', error);
     });
 
-    function posApp() {
+    function normalizeRole(role) {
+      return String(role || 'customer').trim().toLowerCase();
+    }
+
+    function readableAuthError(error) {
+      if (error.code === 'permission-denied') return 'Your account is signed in, but Firestore denied access to your user profile.';
+      if (error.code === 'auth/requires-recent-login') return 'Please log out, log back in, and try that password change again.';
+      if (error.code === 'auth/weak-password') return 'Password must be at least 6 characters.';
+      if (error.code === 'auth/network-request-failed') return 'Network error. Check your connection and try again.';
+      if (error.code === 'auth/user-token-expired') return 'Your saved login expired. Please log in again.';
+      if (error.code === 'auth/user-disabled') return 'This account has been disabled.';
+      return 'Authentication failed. Please log in again.';
+    }
+
+    async function getUserProfile(user) {
+      const doc = await db.collection('users').doc(user.uid).get();
+      return doc.exists ? { id: doc.id, data: doc.data() } : null;
+    }
+
+    let currentUser = null;
+    let allGlobalOrders = [];
+    let lastOrderStatuses = {};
+    let notifications = [];
+    let unreadNotifications = 0;
+    let unsubscribeProfile = null;
+    let customerStarted = false;
+    let activeCustomerUid = null;
+
+    function showCustomerApp() {
+      const loader = document.getElementById('customer-auth-loading');
+      const app = document.getElementById('customer-app');
+      if (loader) loader.classList.add('hidden');
+      if (app) app.classList.remove('auth-hidden');
+    }
+
+    function redirectToLogin() {
+      window.location.replace('login.html');
+    }
+
+    function redirectToAdmin() {
+      window.location.replace('admin.html');
+    }
+
+    function renderNotifications() {
+      const badge = document.getElementById('notification-badge');
+      const list = document.getElementById('notification-list');
+      if (!badge || !list) return;
+
+      badge.innerText = unreadNotifications > 9 ? '9+' : unreadNotifications;
+      badge.style.display = unreadNotifications > 0 ? 'flex' : 'none';
+
+      if (!notifications.length) {
+        list.innerHTML = '<div class="notification-item">No notifications yet.</div>';
+        return;
+      }
+
+      list.innerHTML = notifications.map((n, index) => `
+        <div class="notification-item ${n.orderKey ? 'has-order' : ''}" ${n.orderKey ? `onclick="openNotificationOrder(${index})"` : ''}>
+          <strong>${n.title}</strong>
+          <span>${n.message}</span>
+          ${n.orderKey ? '<div style="font-size:11px; color:#355cff; font-weight:600; margin-top:6px;">View order details</div>' : ''}
+          <div style="font-size:10px; color:#94a3b8; margin-top:4px;">${n.time}</div>
+        </div>
+      `).join('');
+    }
+
+    function getNotificationCacheKey() {
+      return currentUser && currentUser.uid ? `pos_customer_notifications_${currentUser.uid}` : '';
+    }
+
+    function cacheNotifications() {
+      const key = getNotificationCacheKey();
+      if (!key) return;
+      try {
+        localStorage.setItem(key, JSON.stringify({ notifications, unreadNotifications }));
+      } catch (error) {
+        console.error('Could not cache notifications:', error);
+      }
+    }
+
+    function loadNotifications() {
+      const key = getNotificationCacheKey();
+      if (!key) return;
+      try {
+        const cached = JSON.parse(localStorage.getItem(key) || '{}');
+        notifications = Array.isArray(cached.notifications) ? cached.notifications.slice(0, 12) : [];
+        unreadNotifications = Number(cached.unreadNotifications) || 0;
+      } catch (error) {
+        console.error('Could not load notifications:', error);
+        notifications = [];
+        unreadNotifications = 0;
+      }
+      renderNotifications();
+    }
+
+    function addNotification(title, message, orderKey = '') {
+      notifications.unshift({
+        title,
+        message,
+        orderKey,
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      });
+      notifications = notifications.slice(0, 12);
+      unreadNotifications++;
+      cacheNotifications();
+      renderNotifications();
+    }
+
+    function openNotificationOrder(index) {
+      const notification = notifications[index];
+      if (!notification || !notification.orderKey) return;
+      const panel = document.getElementById('notification-panel');
+      if (panel) panel.classList.remove('show');
+      unreadNotifications = 0;
+      cacheNotifications();
+      renderNotifications();
+      viewCustomerOrderDetails(notification.orderKey);
+    }
+
+    function toggleNotifications() {
+      const panel = document.getElementById('notification-panel');
+      if (!panel) return;
+      panel.classList.toggle('show');
+      if (panel.classList.contains('show')) {
+        unreadNotifications = 0;
+        cacheNotifications();
+        renderNotifications();
+      }
+    }
+
+    function normalizeOrderStatus(order) {
+      return String(order.status || order.stat || 'preparing').trim().toLowerCase();
+    }
+
+    function statusLabel(status) {
+      return String(status || 'preparing').replace(/^\w/, c => c.toUpperCase());
+    }
+
+    function orderStatusNotificationText(displayId, status) {
+      if (status === 'served' || status === 'completed') return `Your order #${displayId} is served.`;
+      return `Your order #${displayId} is now ${statusLabel(status)}.`;
+    }
+
+    function createOrderDocumentId(userId) {
+      const random = Math.random().toString(36).slice(2, 10);
+      return `order_${Date.now()}_${String(userId || 'guest').slice(0, 8)}_${random}`;
+    }
+
+    function getOrderDisplayId(order) {
+      return order.ticketId || order.displayId || order.id || order.docId || '';
+    }
+
+    function getCustomerOrderCacheKey() {
+      return currentUser && currentUser.uid ? `pos_customer_orders_${currentUser.uid}` : '';
+    }
+
+    function getOrderSortValue(order) {
+      if (order.timestamp && typeof order.timestamp.toMillis === 'function') return order.timestamp.toMillis();
+      if (order.timestampMillis) return Number(order.timestampMillis) || 0;
+      if (order.createdAtMillis) return Number(order.createdAtMillis) || 0;
+      const parsed = Date.parse(`${order.date || ''} ${order.time || ''}`);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    function sortCustomerOrders(orders) {
+      return orders.sort((a, b) => getOrderSortValue(b) - getOrderSortValue(a));
+    }
+
+    function orderCacheCopy(order) {
       return {
-        currentView: "auth",
-        currentUser: null,
-        authMode: "login",
-        loginForm: { email: "", password: "" },
-        signupForm: { name: "", email: "", password: "" },
-        authError: "",
-        showLoginPassword: false,
-        showSignupPassword: false,
-        showResetPassword: false,
-        showConfirmResetPassword: false,
-        showForgotPassword: false,
-        forgotPassword: {
-          step: "lookup",
-          email: "",
-          userId: null,
-          userName: "",
-          newPassword: "",
-          confirmPassword: "",
-          error: ""
-        },
-        toast: { show: false, title: "", message: "" },
-        products: [],
-        categories: [],
-        sales: [],
-        allSales: [],
-        formData: { id: null, name: "", category: "", price: "", image: null },
-        isEditing: false,
-        cart: [],
-        activeCategory: "All",
-        customerMoney: 0,
-        lastReceipt: null,
-        selectedSale: null,
-        ticketNumber: "0000",
-        discount: { type: "percent", value: 0 },
-        discountForm: { type: "percent", value: 0 },
-        adminCredentials: { name: "Administrator", email: "admin@pos.local", password: "admin123", role: "admin" },
-
-        async initApp() {
-          this.ticketNumber = this.generateTicket();
-          await this.seedDefaults();
-          await this.seedAdminAccount();
-          await this.loadSettings();
-          await this.loadCategories();
-          await this.loadProducts();
-          await this.restoreSession();
-        },
-
-        async seedDefaults() {
-          const catCount = await db.categories.count();
-          if (catCount === 0) {
-            await db.categories.bulkAdd([
-              { name: "Burgers" },
-              { name: "Drinks" },
-              { name: "Sides" }
-            ]);
-          }
-
-          const productCount = await db.products.count();
-          if (productCount === 0) {
-            await db.products.bulkAdd([
-              { name: "Classic Burger", category: "Burgers", price: 120, image: null },
-              { name: "Cheese Burger", category: "Burgers", price: 145, image: null },
-              { name: "Fries", category: "Sides", price: 65, image: null },
-              { name: "Iced Tea", category: "Drinks", price: 45, image: null }
-            ]);
-          }
-        },
-
-        async seedAdminAccount() {
-          const admin = await db.users.where("email").equals(this.adminCredentials.email).first();
-          if (!admin) {
-            await db.users.add({
-              name: this.adminCredentials.name,
-              email: this.adminCredentials.email,
-              password: this.adminCredentials.password,
-              role: this.adminCredentials.role,
-              createdAt: new Date().toISOString()
-            });
-          } else {
-            await db.users.update(admin.id, {
-              name: this.adminCredentials.name,
-              password: this.adminCredentials.password,
-              role: this.adminCredentials.role
-            });
-          }
-        },
-
-        async restoreSession() {
-          const storedUserId = Number(localStorage.getItem("posCurrentUserId") || 0);
-          if (!storedUserId) {
-            this.currentView = "auth";
-            return;
-          }
-
-          const user = await db.users.get(storedUserId);
-          if (!user) {
-            localStorage.removeItem("posCurrentUserId");
-            this.currentView = "auth";
-            return;
-          }
-
-          await this.enterUserSession(user);
-        },
-
-        setAuthMode(mode) {
-          this.authMode = mode;
-          this.authError = "";
-          this.showLoginPassword = false;
-          this.showSignupPassword = false;
-        },
-
-        showToast(title, message) {
-          this.toast = { show: true, title, message };
-          window.clearTimeout(this.toastTimer);
-          this.toastTimer = window.setTimeout(() => {
-            this.toast.show = false;
-          }, 2600);
-        },
-
-        openForgotPassword() {
-          this.authError = "";
-          this.showForgotPassword = true;
-          this.forgotPassword = {
-            step: "lookup",
-            email: this.loginForm.email.trim().toLowerCase(),
-            userId: null,
-            userName: "",
-            newPassword: "",
-            confirmPassword: "",
-            error: ""
-          };
-          this.showResetPassword = false;
-          this.showConfirmResetPassword = false;
-        },
-
-        closeForgotPassword() {
-          this.showForgotPassword = false;
-          this.forgotPassword = {
-            step: "lookup",
-            email: "",
-            userId: null,
-            userName: "",
-            newPassword: "",
-            confirmPassword: "",
-            error: ""
-          };
-          this.showResetPassword = false;
-          this.showConfirmResetPassword = false;
-        },
-
-        async findResetAccount() {
-          const email = this.forgotPassword.email.trim().toLowerCase();
-          if (!email) {
-            this.forgotPassword.error = "Enter your registered email address.";
-            return;
-          }
-
-          const user = await db.users.where("email").equals(email).first();
-          if (!user) {
-            this.forgotPassword.error = "No account was found with that email.";
-            return;
-          }
-
-          this.forgotPassword = {
-            ...this.forgotPassword,
-            step: "reset",
-            email,
-            userId: user.id,
-            userName: user.name,
-            newPassword: "",
-            confirmPassword: "",
-            error: ""
-          };
-        },
-
-        async resetPassword() {
-          const password = this.forgotPassword.newPassword;
-          const confirm = this.forgotPassword.confirmPassword;
-
-          if (!this.forgotPassword.userId) {
-            this.forgotPassword.error = "Please find your account first.";
-            return;
-          }
-          if (password.length < 4) {
-            this.forgotPassword.error = "Password must be at least 4 characters.";
-            return;
-          }
-          if (password !== confirm) {
-            this.forgotPassword.error = "Passwords do not match.";
-            return;
-          }
-
-          const user = await db.users.get(this.forgotPassword.userId);
-          if (!user || user.email !== this.forgotPassword.email) {
-            this.forgotPassword.error = "Account could not be verified. Please try again.";
-            return;
-          }
-
-          await db.users.update(user.id, { password });
-          this.loginForm = { email: user.email, password: "" };
-          this.authMode = "login";
-          this.closeForgotPassword();
-          this.showToast("Password reset successfully!", "Sign in with your new password.");
-        },
-
-        async signUp() {
-          const name = this.signupForm.name.trim();
-          const email = this.signupForm.email.trim().toLowerCase();
-          const password = this.signupForm.password;
-
-          if (!name || !email || password.length < 4) {
-            this.authError = "Please enter your name, email, and a password with at least 4 characters.";
-            return;
-          }
-
-          const existing = await db.users.where("email").equals(email).first();
-          if (existing) {
-            this.authError = "An account with this email already exists.";
-            return;
-          }
-
-          const id = await db.users.add({
-            name,
-            email,
-            password,
-            role: "customer",
-            createdAt: new Date().toISOString()
-          });
-
-          this.loginForm.email = email;
-          this.signupForm = { name: "", email: "", password: "" };
-          this.showSignupPassword = false;
-          this.showToast("Account created successfully!", "You can now sign in and start ordering.");
-          window.setTimeout(() => {
-            this.authMode = "login";
-          }, 900);
-        },
-
-        async signIn() {
-          const email = this.loginForm.email.trim().toLowerCase();
-          const password = this.loginForm.password;
-          const user = await db.users.where("email").equals(email).first();
-
-          if (!user || user.password !== password) {
-            this.authError = "Invalid email or password.";
-            return;
-          }
-
-          this.loginForm = { email: "", password: "" };
-          await this.enterUserSession(user);
-        },
-
-        async enterUserSession(user) {
-          this.currentUser = user;
-          this.authError = "";
-          localStorage.setItem("posCurrentUserId", String(user.id));
-          await this.loadUserCart();
-          await this.loadSales();
-          this.currentView = user.role === "admin" ? "admin" : "pos";
-        },
-
-        async signOut() {
-          await this.saveUserCart();
-          localStorage.removeItem("posCurrentUserId");
-          this.currentUser = null;
-          this.cart = [];
-          this.customerMoney = 0;
-          this.sales = [];
-          this.allSales = [];
-          this.selectedSale = null;
-          this.currentView = "auth";
-        },
-
-        switchView(view) {
-          if (!this.currentUser) {
-            this.currentView = "auth";
-            return;
-          }
-          if (view === "admin" && this.currentUser.role !== "admin") {
-            this.currentView = "pos";
-            return;
-          }
-
-          this.currentView = view;
-          if (view === "pos") this.loadProducts();
-          if (view === "admin" || view === "history") this.loadSales();
-        },
-
-        async loadSettings() {
-          const storedDiscount = await db.settings.get("discount");
-          this.discount = storedDiscount ? storedDiscount.value : { type: "percent", value: 0 };
-          this.discountForm = { ...this.discount };
-        },
-
-        async saveDiscount() {
-          const cleanValue = Math.max(0, Number(this.discountForm.value || 0));
-          this.discount = { type: this.discountForm.type, value: cleanValue };
-          this.discountForm = { ...this.discount };
-          await db.settings.put({ key: "discount", value: this.discount });
-          alert("Discount saved.");
-        },
-
-        async loadCategories() {
-          this.categories = await db.categories.orderBy("name").toArray();
-        },
-
-        async loadProducts() {
-          this.products = await db.products.reverse().toArray();
-        },
-
-        async loadSales() {
-          let sales;
-          if (this.currentUser && this.currentUser.role === "admin") {
-            sales = await db.sales.orderBy("timestamp").reverse().toArray();
-            const users = await db.users.toArray();
-            const namesById = users.reduce((map, user) => {
-              map[user.id] = user.name;
-              return map;
-            }, {});
-            sales = sales.map((sale) => ({
-              ...sale,
-              customerName: sale.customerName || namesById[sale.userId] || "Guest"
-            }));
-          } else if (this.currentUser) {
-            sales = await db.sales.where("userId").equals(this.currentUser.id).toArray();
-            sales.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            sales = sales.map((sale) => ({
-              ...sale,
-              customerName: sale.customerName || this.currentUser.name
-            }));
-          } else {
-            sales = [];
-          }
-          this.sales = sales.map((sale) => this.normalizeSale(sale));
-          this.allSales = this.sales;
-        },
-
-        normalizeSale(sale) {
-          return {
-            ...sale,
-            customerName: sale.customerName || sale.customerEmail || "Guest",
-            paymentStatus: sale.paymentStatus || sale.status || "Paid",
-            orderStatus: sale.orderStatus || "Preparing",
-            discountAmount: Number(sale.discountAmount || 0),
-            subtotal: Number(sale.subtotal || sale.total || 0)
-          };
-        },
-
-        async updateSale(sale) {
-          await db.sales.update(sale.id, {
-            paymentStatus: sale.paymentStatus,
-            orderStatus: sale.orderStatus
-          });
-          await this.loadSales();
-        },
-
-        handleImageUpload(event) {
-          const file = event.target.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            this.formData.image = e.target.result;
-          };
-          reader.readAsDataURL(file);
-        },
-
-        async addNewCategory() {
-          const name = prompt("Enter the name of the new category:");
-          if (!name || !name.trim()) return;
-          const trimmed = name.trim();
-          await db.categories.add({ name: trimmed });
-          await this.loadCategories();
-          this.formData.category = trimmed;
-        },
-
-        async deleteCategory(id) {
-          const category = this.categories.find((item) => item.id === id);
-          if (!category) return;
-          if (!confirm("Delete category '" + category.name + "'?")) return;
-          await db.categories.delete(id);
-          if (this.formData.category === category.name) this.formData.category = "";
-          await this.loadCategories();
-        },
-
-        async saveProduct() {
-          const payload = {
-            name: this.formData.name,
-            category: this.formData.category,
-            price: Number(this.formData.price || 0),
-            image: this.formData.image
-          };
-
-          if (this.isEditing) {
-            await db.products.update(this.formData.id, payload);
-          } else {
-            await db.products.add(payload);
-          }
-
-          this.resetForm();
-          await this.loadProducts();
-        },
-
-        editProduct(product) {
-          this.formData = { ...product };
-          this.isEditing = true;
-        },
-
-        async deleteProduct(id) {
-          if (!confirm("Are you sure you want to delete this item?")) return;
-          await db.products.delete(id);
-          await this.loadProducts();
-        },
-
-        resetForm() {
-          this.formData = { id: null, name: "", category: "", price: "", image: null };
-          this.isEditing = false;
-          const input = document.querySelector('input[type="file"]');
-          if (input) input.value = "";
-        },
-
-        get filteredProducts() {
-          if (this.activeCategory === "All") return this.products;
-          return this.products.filter((product) => product.category === this.activeCategory);
-        },
-
-        get cartSubtotal() {
-          return this.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        },
-
-        get discountAmount() {
-          const raw = this.discount.type === "percent"
-            ? this.cartSubtotal * (Number(this.discount.value || 0) / 100)
-            : Number(this.discount.value || 0);
-          return Math.min(this.cartSubtotal, Math.max(0, raw));
-        },
-
-        get cartTotal() {
-          return Math.max(0, this.cartSubtotal - this.discountAmount);
-        },
-
-        get change() {
-          return Math.max(0, Number(this.customerMoney || 0) - this.cartTotal);
-        },
-
-        userCartKey() {
-          return this.currentUser ? "posCart:" + this.currentUser.id : "";
-        },
-
-        async loadUserCart() {
-          const key = this.userCartKey();
-          if (!key) {
-            this.cart = [];
-            return;
-          }
-
-          try {
-            this.cart = JSON.parse(localStorage.getItem(key) || "[]");
-          } catch (error) {
-            this.cart = [];
-          }
-        },
-
-        async saveUserCart() {
-          const key = this.userCartKey();
-          if (!key) return;
-          localStorage.setItem(key, JSON.stringify(this.cart));
-        },
-
-        addToCart(product) {
-          const existing = this.cart.find((item) => item.id === product.id);
-          if (existing) {
-            existing.quantity += 1;
-          } else {
-            this.cart.push({
-              id: product.id,
-              name: product.name,
-              price: product.price,
-              quantity: 1
-            });
-          }
-          this.saveUserCart();
-        },
-
-        increaseQty(id) {
-          const item = this.cart.find((cartItem) => cartItem.id === id);
-          if (item) item.quantity += 1;
-          this.saveUserCart();
-        },
-
-        decreaseQty(id) {
-          const item = this.cart.find((cartItem) => cartItem.id === id);
-          if (!item) return;
-          item.quantity -= 1;
-          if (item.quantity <= 0) {
-            this.cart = this.cart.filter((cartItem) => cartItem.id !== id);
-          }
-          this.saveUserCart();
-        },
-
-        clearCart() {
-          if (!this.cart.length) return;
-          if (!confirm("Clear current order?")) return;
-          this.cart = [];
-          this.customerMoney = 0;
-          this.saveUserCart();
-        },
-
-        async checkout() {
-          if (!this.currentUser) {
-            this.currentView = "auth";
-            return;
-          }
-          if (this.cart.length === 0) return;
-          if (Number(this.customerMoney || 0) < this.cartTotal) {
-            alert("Insufficient payment amount.");
-            return;
-          }
-
-          const saleRecord = {
-            userId: this.currentUser.id,
-            customerName: this.currentUser.name,
-            customerEmail: this.currentUser.email,
-            items: this.cart.map((item) => ({ ...item })),
-            subtotal: this.cartSubtotal,
-            discountAmount: this.discountAmount,
-            total: this.cartTotal,
-            paid: Number(this.customerMoney || 0),
-            change: this.change,
-            paymentStatus: "Paid",
-            orderStatus: "Preparing",
-            timestamp: new Date().toISOString()
-          };
-
-          const id = await db.sales.add(saleRecord);
-          this.lastReceipt = { ...saleRecord, id };
-          this.cart = [];
-          this.customerMoney = 0;
-          await this.saveUserCart();
-          this.ticketNumber = this.generateTicket();
-          await this.loadSales();
-          alert("Order charged successfully.");
-        },
-
-        async showOrderHistory() {
-          if (!this.currentUser) {
-            this.currentView = "auth";
-            return;
-          }
-          await this.loadSales();
-          this.currentView = "history";
-        },
-
-        backToPos() {
-          this.currentView = "pos";
-        },
-
-        showSaleDetails(sale) {
-          this.selectedSale = this.normalizeSale(sale);
-        },
-
-        closeSaleDetails() {
-          this.selectedSale = null;
-        },
-
-        printReceipt(transaction) {
-          const receipt = transaction || this.lastReceipt;
-          if (!receipt || !receipt.items || receipt.items.length === 0) {
-            alert("No receipt available to print.");
-            return;
-          }
-
-          const receiptWindow = window.open("", "_blank", "width=400,height=620");
-          const date = new Date(receipt.timestamp || Date.now()).toLocaleString();
-          const customer = receipt.customerName ? "<p>Customer: " + receipt.customerName + "</p>" : "";
-          const items = receipt.items.map((item) => {
-            return "<div class='row'><span>" + item.name + " x " + item.quantity + "</span><span>" + this.formatMoney(item.price * item.quantity) + "</span></div>";
-          }).join("");
-
-          receiptWindow.document.write(
-            "<html><head><title>Receipt</title><style>" +
-            "body{font-family:'Courier New',monospace;font-size:12px;padding:12px}.center{text-align:center}.row{display:flex;justify-content:space-between;margin:6px 0}.line{border-top:1px dashed #000;margin:10px 0}.bold{font-weight:bold}" +
-            "</style></head><body>" +
-            "<div class='center'><h2>POS RECEIPT</h2><p>" + date + "</p>" + customer + "</div><div class='line'></div>" +
-            items +
-            "<div class='line'></div>" +
-            "<div class='row'><span>Subtotal</span><span>" + this.formatMoney(receipt.subtotal || receipt.total) + "</span></div>" +
-            "<div class='row'><span>Discount</span><span>-" + this.formatMoney(receipt.discountAmount || 0) + "</span></div>" +
-            "<div class='row bold'><span>Total</span><span>" + this.formatMoney(receipt.total) + "</span></div>" +
-            "<div class='row'><span>Paid</span><span>" + this.formatMoney(receipt.paid || 0) + "</span></div>" +
-            "<div class='row'><span>Change</span><span>" + this.formatMoney(receipt.change || 0) + "</span></div>" +
-            "<div class='line'></div><div class='center'>Thank you!</div>" +
-            "</body></html>"
-          );
-          receiptWindow.document.close();
-          setTimeout(() => {
-            receiptWindow.print();
-            receiptWindow.close();
-          }, 300);
-        },
-
-        formatMoney(value) {
-          return "PHP " + Number(value || 0).toFixed(2);
-        },
-
-        formatDate(value) {
-          return new Date(value).toLocaleString();
-        },
-
-        badgeClass(status) {
-          if (status === "Paid" || status === "Served") return "bg-green-100 text-green-800";
-          return "bg-yellow-100 text-yellow-800";
-        },
-
-        generateTicket() {
-          return Math.floor(Math.random() * 10000).toString().padStart(4, "0");
-        }
+        ...order,
+        timestamp: undefined,
+        timestampMillis: getOrderSortValue(order)
       };
     }
+
+    function cacheCustomerOrders(orders) {
+      const key = getCustomerOrderCacheKey();
+      if (!key) return;
+      try {
+        localStorage.setItem(key, JSON.stringify(sortCustomerOrders(orders.map(orderCacheCopy)).slice(0, 200)));
+      } catch (error) {
+        console.error('Could not cache customer orders:', error);
+      }
+    }
+
+    function loadCachedCustomerOrders() {
+      const key = getCustomerOrderCacheKey();
+      if (!key) return [];
+      try {
+        const cached = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(cached) ? cached : [];
+      } catch (error) {
+        console.error('Could not load cached customer orders:', error);
+        return [];
+      }
+    }
+
+    function mergeCustomerOrders(primaryOrders, fallbackOrders = []) {
+      const merged = {};
+      [...fallbackOrders, ...primaryOrders].forEach(order => {
+        const key = order.docId || order.id || order.ticketId;
+        if (!key) return;
+        merged[key] = { ...merged[key], ...order };
+      });
+      return sortCustomerOrders(Object.values(merged));
+    }
+
+    function findKnownOrder(orderKey) {
+      return allGlobalOrders.find(order => (order.docId || order.id || order.ticketId) === orderKey);
+    }
+
+    function rememberOrderStatus(order) {
+      const key = order.docId || order.id || order.ticketId;
+      if (!key) return;
+      lastOrderStatuses[key] = {
+        status: normalizeOrderStatus(order),
+        paymentStatus: order.paymentStatus || order.pay || ''
+      };
+    }
+
+    function notifyOrderChanges(incomingOrder) {
+      const statusKey = incomingOrder.docId || incomingOrder.id || incomingOrder.ticketId;
+      if (!statusKey) return;
+
+      const previousMemory = lastOrderStatuses[statusKey];
+      const previousOrder = findKnownOrder(statusKey);
+      const previousStatus = previousMemory ? previousMemory.status : (previousOrder ? normalizeOrderStatus(previousOrder) : '');
+      const previousPayment = previousMemory ? previousMemory.paymentStatus : (previousOrder ? (previousOrder.paymentStatus || previousOrder.pay || '') : '');
+      const currentStatus = normalizeOrderStatus(incomingOrder);
+      const currentPayment = incomingOrder.paymentStatus || incomingOrder.pay || '';
+      const displayId = getOrderDisplayId(incomingOrder);
+
+      if (previousStatus && previousStatus !== currentStatus) {
+        const message = orderStatusNotificationText(displayId, currentStatus);
+        addNotification("Order Update", message, statusKey);
+        showToast("Order Update", message);
+      }
+
+      if (previousPayment && previousPayment !== currentPayment) {
+        const message = `Your order #${displayId} payment is now ${currentPayment}.`;
+        addNotification("Payment Update", message, statusKey);
+        showToast("Payment Update", message);
+      }
+
+      rememberOrderStatus(incomingOrder);
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        redirectToLogin();
+      } else {
+        try {
+          await authReady;
+          if (unsubscribeProfile) unsubscribeProfile();
+          unsubscribeProfile = db.collection('users').doc(user.uid).onSnapshot(snapshot => {
+            if (!snapshot.exists) {
+              alert("Your login works, but your Firestore user document is missing. Please sign up again or contact support.");
+              auth.signOut().then(redirectToLogin);
+              return;
+            }
+
+            currentUser = snapshot.data();
+            currentUser.uid = user.uid;
+            currentUser.role = normalizeRole(currentUser.role);
+            const isNewCustomerSession = activeCustomerUid !== user.uid;
+
+            if (currentUser.role === 'admin') {
+              redirectToAdmin();
+              return;
+            }
+
+            if (currentUser.role !== 'customer') {
+              alert("Your account role is missing or invalid. Please contact support.");
+              auth.signOut().then(redirectToLogin);
+              return;
+            }
+
+            showCustomerApp();
+
+            document.getElementById('top-name').innerText = currentUser.name || currentUser.email;
+            document.getElementById('prof-disp-name').innerText = currentUser.name || currentUser.email;
+            document.getElementById('prof-name').value = currentUser.name || '';
+            document.getElementById('prof-username').value = currentUser.username || '';
+            document.getElementById('prof-email').value = currentUser.email || user.email || '';
+
+            if (isNewCustomerSession) {
+              loadNotifications();
+            }
+
+            if (!customerStarted || isNewCustomerSession) {
+              customerStarted = true;
+              activeCustomerUid = user.uid;
+              setupRealtimeListeners();
+            }
+          }, error => {
+            alert(readableAuthError(error));
+            auth.signOut().then(redirectToLogin);
+          });
+        } catch (error) {
+          alert(readableAuthError(error));
+          auth.signOut().then(redirectToLogin);
+        }
+      }
+    });
+
+    // Data Engine Setup
+    let activeFilter = 'All', activeQuery = '', basket = [];
+    let catalog = [];
+    let discount = { type: 'percent', value: 0 };
+    let unsubscribeOrders = null;
+    let unsubscribeProducts = null;
+    let unsubscribeDiscount = null;
+
+    function normalizeProduct(doc) {
+      const data = doc.data ? doc.data() : doc;
+      return {
+        ...data,
+        docId: doc.id || data.docId,
+        name: data.productName || data.name || '',
+        img: data.imageURL || data.img || '',
+        imageURL: data.imageURL || data.img || '',
+        productName: data.productName || data.name || '',
+        price: Number(data.price) || 0
+      };
+    }
+    if (false) {
+      catalog = [
+        { id: 1, name: "Burger", price: 120, category: "Meals", stock: 50, status: "Available", img: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&fit=crop&q=80" },
+        { id: 2, name: "Fries", price: 60, category: "Snacks", stock: 80, status: "Available", img: "https://images.unsplash.com/photo-1576107232684-1279f390859f?w=300&fit=crop&q=80" },
+        { id: 3, name: "Fried Chicken", price: 110, category: "Meals", stock: 30, status: "Available", img: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=300&fit=crop&q=80" },
+        { id: 4, name: "Spaghetti", price: 95, category: "Meals", stock: 25, status: "Available", img: "https://images.unsplash.com/photo-1598866594230-a7c12756260f?w=300&fit=crop&q=80" },
+        { id: 5, name: "Iced Coffee", price: 75, category: "Beverages", stock: 40, status: "Available", img: "https://images.unsplash.com/photo-1517701550927-30cf4ba1fdf2?w=300&fit=crop&q=80" },
+        { id: 6, name: "Lemonade", price: 50, category: "Beverages", stock: 35, status: "Available", img: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=300&fit=crop&q=80" },
+        { id: 7, name: "Water", price: 20, category: "Beverages", stock: 100, status: "Available", img: "https://images.unsplash.com/photo-1559839914-17aae19cb5aa?w=300&fit=crop&q=80" },
+        { id: 8, name: "Chocolate Cake", price: 85, category: "Desserts", stock: 20, status: "Available", img: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=300&fit=crop&q=80" }
+      ];
+      localStorage.setItem('pos_catalog', JSON.stringify(catalog));
+    }
+
+    function switchTab(mod) {
+      document.querySelectorAll('.module-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(`tab-${mod}`).classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      const navItem = Array.from(document.querySelectorAll('.nav-item')).find(n => n.getAttribute('onclick') === `switchTab('${mod}')`);
+      if (navItem) navItem.classList.add('active');
+
+      const meta = { pos: { t: "Order Menu", s: "Order items" }, history: { t: "My Orders", s: "View your order history" }, profile: { t: "My Profile", s: "Update your personal information." } };
+      if (meta[mod]) { document.getElementById('view-title').innerText = meta[mod].t; document.getElementById('view-sub').innerText = meta[mod].s; }
+      if (mod === 'pos') { mountCatalog(); assignID(); }
+      if (mod === 'history') mountHistory();
+    }
+
+    function assignID() { document.getElementById('ticket-id').innerText = `Ticket: #${Math.floor(1000 + Math.random() * 8999)}`; }
+    function queryCatalog(val) { activeQuery = val; mountCatalog(); }
+    function filterCat(cat, btn) { document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active')); btn.classList.add('active'); activeFilter = cat; mountCatalog(); }
+
+    function mountCatalog() {
+      const mount = document.getElementById('catalog-mount'); mount.innerHTML = '';
+      catalog.forEach(ent => {
+        if ((activeFilter === 'All' || ent.category === activeFilter) && ent.name.toLowerCase().includes(activeQuery.toLowerCase())) {
+          mount.innerHTML += `
+          <div class="item-card">
+            <img src="${ent.imageURL || ent.img}" alt="${ent.name}" loading="lazy" decoding="async"/>
+            <h4>${ent.name}</h4>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+               <p>₱${ent.price.toFixed(2)}</p>
+               <button class="btn-add" onclick="pushItem(${ent.id})"><i class="fa-solid fa-plus"></i></button>
+            </div>
+          </div>`;
+        }
+      });
+    }
+
+    function pushItem(id) {
+      const ent = catalog.find(e => e.id === id), line = basket.find(i => i.id === id);
+      line ? line.qty++ : basket.push({ ...ent, qty: 1 }); renderBasket();
+    }
+    function updateQty(id, offset) { const line = basket.find(i => i.id === id); line.qty += offset; if (line.qty <= 0) basket = basket.filter(i => i.id !== id); renderBasket(); }
+
+    let currentBasketTotal = 0;
+    function renderBasket() {
+      const mount = document.getElementById('basket-mount'); mount.innerHTML = ''; let sub = 0;
+      if (basket.length === 0) {
+        mount.innerHTML = `<div style="flex:1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:13px; height:100%; margin:auto;">Tap items to add them here.</div>`;
+      } else {
+        basket.forEach((l, i) => { sub += l.price * l.qty; mount.innerHTML += `<div class="basket-row"><div><h5 style="font-size:13px;">${l.name}</h5><span style="font-size:12px; color:#6b7280;">₱${l.price.toFixed(2)}</span></div><div class="qty-ctrls"><div style="display:flex; align-items:center; gap:8px; border:1px solid #e5e7eb; border-radius:20px; padding:2px 8px; margin-right: 8px;"><button style="border:none; background:none; cursor:pointer; color:#6b7280; font-size:14px; padding:0 4px;" onclick="updateQty(${l.id},-1)">-</button><span style="font-size:12px; font-weight:500;">${l.qty}</span><button style="border:none; background:none; cursor:pointer; color:#6b7280; font-size:14px; padding:0 4px;" onclick="updateQty(${l.id},1)">+</button></div><button onclick="updateQty(${l.id}, -${l.qty})" style="border:none; background:none; color:#9ca3af; font-size: 14px;"><i class="fa-solid fa-trash-can"></i></button></div></div>`; });
+      }
+      let total = sub;
+      if (discount && discount.value > 0) {
+        if (discount.type === 'percent') {
+          total = sub - (sub * (discount.value / 100));
+        } else if (discount.type === 'fixed') {
+          total = Math.max(0, sub - discount.value);
+        }
+      }
+      currentBasketTotal = total;
+      document.getElementById('basket-sub').innerText = `₱${sub.toFixed(2)}`; document.getElementById('basket-total').innerText = `₱${total.toFixed(2)}`; evalTender();
+    }
+
+    function clearBasket() {
+      if (basket.length > 0 && confirm("Are you sure you want to clear the current order?")) {
+        basket = [];
+        document.getElementById('tendered-cash').value = '';
+        renderBasket();
+      }
+    }
+
+    function evalTender() {
+      const sum = currentBasketTotal, cash = parseFloat(document.getElementById('tendered-cash').value) || 0, due = cash - sum;
+      const d = document.getElementById('change-disp');
+      if (d) {
+        d.innerText = due >= 0 && sum > 0 ? `₱${due.toFixed(2)}` : '₱0.00'; d.style.color = due >= 0 && sum > 0 ? '#10b981' : '#6b7280';
+      }
+      const err = document.getElementById('payment-error');
+      if (cash >= sum || cash === 0 || isNaN(cash)) err.style.display = 'none';
+      else if (cash > 0 && cash < sum) err.style.display = 'block';
+    }
+
+    function resolveTransaction() {
+      if (!basket.length || !currentUser) return;
+      const sum = currentBasketTotal;
+      const cash = parseFloat(document.getElementById('tendered-cash').value) || 0;
+
+      const err = document.getElementById('payment-error');
+      if (cash < sum) {
+        err.style.display = 'block';
+        return;
+      }
+      err.style.display = 'none';
+
+      const ticketId = document.getElementById('ticket-id').innerText.replace('Ticket: #', '');
+      const docId = createOrderDocumentId(currentUser.uid);
+      const d = new Date();
+      const createdAtMillis = Date.now();
+      const dateStr = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+      const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const summaryText = basket.length > 0 ? `${basket[0].name.toLowerCase()} x ${basket[0].qty}` + (basket.length > 1 ? ` +${basket.length - 1}` : '') : `${basket.reduce((a, c) => a + c.qty, 0)} items`;
+
+      const orderData = {
+        id: ticketId,
+        ticketId: ticketId,
+        docId: docId,
+        userId: currentUser.uid,
+        cust: currentUser.name,
+        items: basket.reduce((a, c) => a + c.qty, 0),
+        summary: summaryText,
+        total: sum,
+        totalPrice: sum,
+        pay: "Cash",
+        stat: "Preparing",
+        status: "preparing",
+        paymentStatus: "Paid",
+        time: timeStr,
+        date: dateStr,
+        cartItems: [...basket],
+        createdAtMillis: createdAtMillis,
+        timestampMillis: createdAtMillis,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      const localOrderData = orderCacheCopy(orderData);
+
+      allGlobalOrders = mergeCustomerOrders([localOrderData], allGlobalOrders);
+      cacheCustomerOrders(allGlobalOrders);
+
+      db.collection('orders').doc(docId).set(orderData).then(() => {
+        showToast("Order Successful!", `Your order #${ticketId} has been placed.`);
+        basket = []; document.getElementById('tendered-cash').value = ''; renderBasket(); assignID();
+        lastOrderStatuses[docId] = { status: orderData.status, paymentStatus: orderData.paymentStatus };
+        switchTab('history');
+      }).catch(err => {
+        showToast("Error", err.message);
+      });
+    }
+
+    function setupRealtimeListeners() {
+      allGlobalOrders = loadCachedCustomerOrders();
+      allGlobalOrders.forEach(rememberOrderStatus);
+      if (document.getElementById('tab-history').classList.contains('active')) {
+        mountHistory();
+      }
+
+      if (unsubscribeOrders) unsubscribeOrders();
+      unsubscribeOrders = db.collection('orders')
+        .where('userId', '==', currentUser.uid)
+        .onSnapshot(snapshot => {
+          const firestoreOrders = [];
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            data.docId = doc.id;
+            data.id = data.id || data.ticketId || doc.id;
+            data.timestampMillis = getOrderSortValue(data);
+            firestoreOrders.push(data);
+            notifyOrderChanges(data);
+          });
+          allGlobalOrders = mergeCustomerOrders(firestoreOrders, allGlobalOrders);
+          allGlobalOrders.forEach(rememberOrderStatus);
+          cacheCustomerOrders(allGlobalOrders);
+
+          if (document.getElementById('tab-history').classList.contains('active')) {
+            mountHistory();
+          }
+        }, error => {
+          allGlobalOrders = mergeCustomerOrders(loadCachedCustomerOrders(), allGlobalOrders);
+          if (document.getElementById('tab-history').classList.contains('active')) {
+            mountHistory();
+          }
+          showToast("Error", error.code === 'permission-denied' ? 'Firestore denied access to your orders.' : readableAuthError(error));
+        });
+
+      if (unsubscribeProducts) unsubscribeProducts();
+      unsubscribeProducts = db.collection('products').onSnapshot(snapshot => {
+        catalog = [];
+        snapshot.forEach(doc => {
+          catalog.push(normalizeProduct(doc));
+        });
+        if (document.getElementById('tab-pos').classList.contains('active')) {
+          mountCatalog();
+        }
+      }, error => {
+        showToast("Error", error.code === 'permission-denied' ? 'Firestore denied access to products.' : readableAuthError(error));
+      });
+
+      if (unsubscribeDiscount) unsubscribeDiscount();
+      unsubscribeDiscount = db.collection('settings').doc('discount').onSnapshot(doc => {
+        if (doc.exists) {
+          discount = doc.data();
+          renderBasket();
+        }
+      }, error => {
+        showToast("Error", error.code === 'permission-denied' ? 'Firestore denied access to discount settings.' : readableAuthError(error));
+      });
+    }
+
+    function mountHistory() {
+      const mount = document.getElementById('history-mount'); mount.innerHTML = '';
+      if (!allGlobalOrders.length) {
+        mount.innerHTML = `<tr><td colspan="7" style="padding:32px; text-align:center; color:#94a3b8; font-size:13px;">No orders yet.</td></tr>`;
+        return;
+      }
+      allGlobalOrders.forEach(o => {
+        const status = normalizeOrderStatus(o);
+        const statusText = statusLabel(status);
+        const displayId = getOrderDisplayId(o);
+        const lookupId = o.docId || o.id;
+        const payColor = o.paymentStatus === 'Paid' ? '#065f46' : '#9f1239';
+        const payBg = o.paymentStatus === 'Paid' ? '#a7f3d0' : '#fecdd3';
+        const statColor = status === 'served' ? '#1e40af' : '#9f1239';
+        const statBg = status === 'served' ? '#dbeafe' : '#fecdd3';
+
+        mount.innerHTML += `<tr>
+          <td style="padding:16px; font-weight:700; color:#0f172a;">${displayId}</td>
+          <td style="padding:16px; color:#64748b; font-size:13px;">${o.time} - ${o.date}</td>
+          <td style="padding:16px; font-weight:600; color:#334155; font-size:13px;">${o.summary || o.items + ' items'}</td>
+          <td style="padding:16px;"><span style="background:${payBg}; color:${payColor}; padding: 4px 10px; border-radius: 6px; font-size:11px; font-weight:600;">${o.paymentStatus || o.pay}</span></td>
+          <td style="padding:16px;"><span style="background:${statBg}; color:${statColor}; padding: 4px 10px; border-radius: 6px; font-size:11px; font-weight:600;">${statusText}</span></td>
+          <td style="padding:16px; font-weight:700; color:#0f172a;">₱${(o.totalPrice || o.total).toFixed(2)}</td>
+          <td style="padding:16px;">
+            <a style="color:#3b82f6; text-decoration:none; font-weight:600; font-size:12px; margin-right:12px; cursor:pointer;" onclick="viewCustomerOrderDetails('${lookupId}')">View</a>
+            <a style="color:#64748b; text-decoration:none; font-weight:600; font-size:12px; cursor:pointer;" onclick="triggerReceiptPrint('${lookupId}')">Print</a>
+          </td>
+        </tr>`;
+      });
+    }
+
+    function syncProfile() {
+      const newName = document.getElementById('prof-name').value;
+      if (!newName || !currentUser) return;
+      db.collection('users').doc(currentUser.uid).update({
+        name: newName
+      }).then(() => {
+        currentUser.name = newName;
+        document.getElementById('top-name').innerText = newName;
+        document.getElementById('prof-disp-name').innerText = newName;
+        showToast("Success!", "Profile updated securely.");
+      }).catch(err => {
+        showToast("Error", readableAuthError(err));
+      });
+    }
+
+    async function promptPasswordChange() {
+      const newPass = prompt("Enter your new password (must be at least 6 characters):");
+      if (newPass && newPass.length >= 6) {
+        try {
+          await authReady;
+          if (!auth.currentUser) {
+            showToast("Error", "Please log in again before changing your password.");
+            return;
+          }
+          await auth.currentUser.updatePassword(newPass);
+          await auth.currentUser.reload();
+          await auth.currentUser.getIdToken(true);
+          showToast("Success!", "Password changed successfully.");
+        } catch (err) {
+          showToast("Error", readableAuthError(err));
+        }
+      } else if (newPass) {
+        showToast("Error", "Password too short.");
+      }
+    }
+
+    function resetProfileForm() {
+      if (currentUser) {
+        document.getElementById('prof-name').value = currentUser.name || '';
+      }
+    }
+
+    function showToast(title, message) {
+      document.getElementById('toast-title').innerText = title;
+      document.getElementById('toast-txt').innerText = message;
+      const t = document.getElementById('app-toast');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    function viewCustomerOrderDetails(id) {
+      let order = allGlobalOrders.find(o => o.docId === id || o.id === id);
+      if (!order) return;
+      const displayId = getOrderDisplayId(order);
+
+      let itemsHtml = '';
+      if (order.cartItems && order.cartItems.length > 0) {
+        order.cartItems.forEach(item => {
+          itemsHtml += `
+             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span>${item.qty}x ${item.name}</span>
+                <span>P${(item.price * item.qty).toFixed(2)}</span>
+             </div>
+           `;
+        });
+      } else {
+        itemsHtml += `<div>Legacy items: ${order.items}</div>`;
+      }
+
+      const receiptHtml = `
+           <div style="text-align:center; margin-bottom:16px;">
+              <h2 style="margin:0; font-size:24px;">CLOUD POS</h2>
+              <p style="margin:4px 0;">Receipt ${displayId}</p>
+              <p style="margin:0;">Date: ${order.date} ${order.time}</p>
+              <p style="margin:4px 0;">Customer: ${order.cust || 'Guest'}</p>
+           </div>
+           <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 12px 0; margin-bottom:12px;">
+              ${itemsHtml}
+           </div>
+           <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:18px; margin-bottom:12px;">
+              <span>TOTAL</span>
+              <span>P${order.total.toFixed(2)}</span>
+           </div>
+           <div style="text-align:center;">
+              <p style="margin:4px 0;">Status: ${order.paymentStatus || order.pay}</p>
+              <p style="margin:16px 0 0 0; font-size:14px;">Thank you for your business!</p>
+           </div>
+      `;
+
+      document.getElementById('modal-receipt-content').innerHTML = receiptHtml;
+      document.getElementById('modal-print-btn').setAttribute('data-id', order.docId || order.id);
+      document.getElementById('order-details-modal').style.display = 'flex';
+    }
+
+    function triggerReceiptPrint(orderId) {
+      const order = allGlobalOrders.find(o => o.docId === orderId || o.id === orderId);
+      if (!order) return;
+      const displayId = getOrderDisplayId(order);
+
+      let itemsHtml = '';
+      if (order.cartItems && order.cartItems.length > 0) {
+        order.cartItems.forEach(item => {
+          itemsHtml += `
+             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span>${item.qty}x ${item.name}</span>
+                <span>P${(item.price * item.qty).toFixed(2)}</span>
+             </div>
+           `;
+        });
+      }
+
+      const receiptHtml = `
+        <div style="width: 300px; font-family: monospace; color: #000; background: #fff; padding: 20px;">
+           <div style="text-align:center; margin-bottom:16px;">
+              <h2 style="margin:0; font-size:24px;">CLOUD POS</h2>
+              <p style="margin:4px 0;">Receipt ${displayId}</p>
+              <p style="margin:0;">Date: ${order.date} ${order.time}</p>
+              <p style="margin:4px 0;">Customer: ${order.cust || 'Guest'}</p>
+           </div>
+           <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 12px 0; margin-bottom:12px;">
+              ${itemsHtml}
+           </div>
+           <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:18px; margin-bottom:12px;">
+              <span>TOTAL</span>
+              <span>P${order.total.toFixed(2)}</span>
+           </div>
+           <div style="text-align:center;">
+              <p style="margin:4px 0;">Status: ${order.paymentStatus || order.pay}</p>
+              <p style="margin:16px 0 0 0; font-size:14px;">Thank you for your business!</p>
+           </div>
+        </div>
+      `;
+
+      let printDiv = document.getElementById('print-receipt-container');
+      if (!printDiv) {
+        printDiv = document.createElement('div');
+        printDiv.id = 'print-receipt-container';
+        document.body.appendChild(printDiv);
+      }
+      printDiv.innerHTML = receiptHtml;
+
+      document.getElementById('order-details-modal').style.display = 'none';
+      window.print();
+    }
+
+    function triggerExit() {
+      cacheCustomerOrders(allGlobalOrders);
+      cacheNotifications();
+      if (unsubscribeOrders) unsubscribeOrders();
+      if (unsubscribeProducts) unsubscribeProducts();
+      if (unsubscribeDiscount) unsubscribeDiscount();
+      if (unsubscribeProfile) unsubscribeProfile();
+      customerStarted = false;
+      activeCustomerUid = null;
+      auth.signOut().then(() => {
+        window.location.href = 'login.html';
+      });
+    }
+
+    // Boot Initialization
+    mountCatalog(); assignID();
   </script>
+  <div id="order-details-modal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center; backdrop-filter:blur(4px);">
+    <div style="background:#fff; width:340px; padding:20px; position:relative; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+      <button onclick="document.getElementById('order-details-modal').style.display='none'"
+        style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:20px; color:#64748b; cursor:pointer; z-index:10;"><i
+          class="fa-solid fa-xmark"></i></button>
+      <div id="modal-receipt-content" style="font-family: monospace; color:#000;">
+        <!-- Inject Receipt HTML here -->
+      </div>
+      <button id="modal-print-btn"
+        style="width:100%; padding:14px; background:#0b132b; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; margin-top: 16px; font-family: 'Poppins', sans-serif;"
+        onclick="triggerReceiptPrint(this.getAttribute('data-id'))"><i class="fa-solid fa-print"
+          style="margin-right:8px;"></i> Print Receipt</button>
+    </div>
+  </div>
 </body>
+
 </html>
